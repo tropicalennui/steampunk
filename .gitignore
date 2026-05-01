@@ -1,0 +1,55 @@
+# ─── Secrets ───────────────────────────────────────────────────────────────────
+gandalf.json
+*.secret
+*.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+
+# ─── PII / Sensitive Data ───────────────────────────────────────────────────────
+# Flat files that may contain personal data
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.db
+*.sqlite
+*.sqlite3
+# Override: allow explicitly committed safe data files by prefixing with "public_"
+!public_*.csv
+!public_*.tsv
+
+# Common PII export formats
+*_pii.*
+*_personal.*
+*_private.*
+*_confidential.*
+pii/
+private/
+confidential/
+
+# ─── OS & Editor noise ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/settings.json
+.idea/
+
+# ─── Logs & Temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.swp
+~$*
+
+# ─── Node / Python / general build artifacts ───────────────────────────────────
+node_modules/
+__pycache__/
+*.pyc
+dist/
+build/
+.cache/
