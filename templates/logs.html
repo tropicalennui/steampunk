@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Sync Logs — SteamPunk{% endblock %}
+
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-amber-400">Sync Logs</h1>
+    {% if sync_running %}
+    <p class="text-amber-400 text-sm animate-pulse mt-0.5">Sync in progress&hellip;</p>
+    {% endif %}
+  </div>
+  <div class="flex items-center gap-4">
+    {% if log_files and not sync_running %}
+    <form method="POST" action="/logs/clear">
+      <button
+        type="submit"
+        class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
+        onclick="return confirm('Delete all sync logs?')"
+      >Clear logs</button>
+    </form>
+    {% endif %}
+    <a href="/library" class="text-sm text-zinc-400 hover:text-zinc-200 transition">&larr; Library</a>
+  </div>
+</div>
+
+{% if log_files %}
+<div class="flex gap-2 flex-wrap mb-4">
+  {% for f in log_files %}
+  {# Convert filename sync_YYYY-MM-DD_HH-MM-SS.log to an ISO UTC string #}
+  {% set ts = f | replace('sync_', '') | replace('.log', '') | replace('_', 'T', 1) | replace('-', ':', 2) + 'Z' %}
+  <a
+    href="/logs?file={{ f }}"
+    class="text-xs px-3 py-1.5 rounded-full border transition
+      {% if f == selected %}
+        border-amber-500 bg-amber-500/10 text-amber-400
+      {% else %}
+        border-zinc-700 text-zinc-500 hover:border-zinc-500 hover:text-zinc-300
+      {% endif %}"
+  >
+    <span data-utc="{{ ts }}">{{ ts }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div
+  id="log-output"
+  class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto whitespace-pre-wrap min-h-64 max-h-[70vh] overflow-y-auto"
+>{% if lines %}{{ lines | join('') }}{% else %}No log entries yet. Click Sync Now on the library page to start a sync.{% endif %}</div>
+
+<script>
+  const el = document.getElementById('log-output');
+  el.scrollTop = el.scrollHeight;
+  {% if sync_running %}
+  setTimeout(() => location.reload(), 2000);
+  {% endif %}
+</script>
+
+{% endblock %}

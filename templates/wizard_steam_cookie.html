@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Setup — SteamPunk{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <!-- Step progress -->
+  <div class="flex items-center justify-center gap-3 text-sm mb-10">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-green-600 text-white font-bold text-xs flex items-center justify-center">✓</div>
+      <span class="text-zinc-500">Steam Setup</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">2</div>
+      <span class="text-amber-400 font-medium">Session Cookie</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-zinc-700 text-zinc-400 font-bold text-xs flex items-center justify-center">3</div>
+      <span class="text-zinc-600">Other Services</span>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-bold text-gray-200 mb-2">Steam Session Cookie</h2>
+  <p class="text-zinc-400 text-sm mb-8">
+    To access your full library without making your Steam profile public, SteamPunk needs
+    your Steam session cookie. This is a read-only token —
+    it is <strong class="text-white">never used to perform any action</strong> on your account.
+  </p>
+
+  {% if error %}
+  <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-8 text-sm text-red-400">
+    That cookie didn't work — Steam returned an empty library response. Double-check you
+    copied the full value from the correct cookie and try again.
+  </div>
+  {% endif %}
+
+  <div class="space-y-6 mb-10">
+
+    <div class="flex gap-4">
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+      <div>
+        <p class="text-gray-200 font-medium">Make sure you're logged into Steam in this browser</p>
+        <p class="text-zinc-500 text-sm mt-0.5">
+          You just signed in via Steam, so you should be. If not,
+          <a href="https://store.steampowered.com/login/" target="_blank" class="text-amber-400 underline hover:text-amber-300">log in at store.steampowered.com</a>
+          first.
+        </p>
+      </div>
+    </div>
+
+    <div class="flex gap-4">
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+      <div>
+        <p class="text-gray-200 font-medium">Open your browser's DevTools</p>
+        <div class="flex gap-3 mt-1.5">
+          <span class="text-xs px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Windows / Linux: <kbd class="text-amber-400">F12</kbd></span>
+          <span class="text-xs px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Mac: <kbd class="text-amber-400">⌘ + Option + I</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-4">
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">3</div>
+      <div>
+        <p class="text-gray-200 font-medium">Navigate to the Cookies panel</p>
+        <div class="mt-2 space-y-2">
+          <div class="bg-zinc-800 border border-zinc-700 rounded p-3 text-sm">
+            <p class="text-amber-400 font-medium mb-1">Chrome / Edge</p>
+            <p class="text-zinc-300">
+              Click <strong>Application</strong> tab →
+              expand <strong>Cookies</strong> in the left sidebar →
+              click <strong>https://steamcommunity.com</strong>
+            </p>
+          </div>
+          <div class="bg-zinc-800 border border-zinc-700 rounded p-3 text-sm">
+            <p class="text-amber-400 font-medium mb-1">Firefox</p>
+            <p class="text-zinc-300">
+              Click <strong>Storage</strong> tab →
+              expand <strong>Cookies</strong> →
+              click <strong>https://steamcommunity.com</strong>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-4">
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">4</div>
+      <div>
+        <p class="text-gray-200 font-medium">Find and copy the <code class="text-amber-400 bg-zinc-800 px-1.5 py-0.5 rounded text-sm">steamLoginSecure</code> cookie</p>
+        <p class="text-zinc-500 text-sm mt-0.5">
+          Look for a row named <strong class="text-zinc-300">steamLoginSecure</strong>.
+          Click it, then copy the entire <strong class="text-zinc-300">Value</strong>
+          — it's a long string that starts with your SteamID followed by
+          <code class="text-zinc-400">%7C%7C</code>.
+        </p>
+      </div>
+    </div>
+
+    <div class="flex gap-4">
+      <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">5</div>
+      <div class="w-full">
+        <p class="text-gray-200 font-medium mb-3">Paste the cookie value below</p>
+        <form method="POST" action="/wizard/steam-cookie">
+          <textarea
+            name="session_cookie"
+            rows="3"
+            placeholder="76561198072286781%7C%7C..."
+            required
+            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono resize-none"
+          ></textarea>
+          <div class="flex items-center justify-between mt-3">
+            <p class="text-zinc-600 text-xs">
+              Stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
+              Only used for read requests.
+            </p>
+            <button
+              type="submit"
+              class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+            >
+              Continue →
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

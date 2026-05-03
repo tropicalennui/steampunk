@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Setup — SteamPunk{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <!-- Step progress -->
+  <div class="flex items-center justify-center gap-3 text-sm mb-10">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-green-600 text-white font-bold text-xs flex items-center justify-center">✓</div>
+      <span class="text-zinc-500">Steam Setup</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-green-600 text-white font-bold text-xs flex items-center justify-center">✓</div>
+      <span class="text-zinc-500">Session Cookie</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">3</div>
+      <span class="text-amber-400 font-medium">Other Services</span>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-bold text-gray-200 mb-1">Connect Other Services</h2>
+  <p class="text-zinc-400 text-sm mb-8">
+    All optional. You can connect more services any time from Preferences.
+  </p>
+
+  <div class="space-y-4 mb-8">
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- GOG                                                                  -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4">
+        <div>
+          <p class="text-gray-200 font-medium">GOG</p>
+          <p class="text-zinc-500 text-xs mt-0.5">Adds your GOG library to the unified view</p>
+        </div>
+        {% if gog_connected and not gog_auth_expired %}
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <span class="text-sm text-green-400">Connected</span>
+        </div>
+        {% else %}
+        <button
+          onclick="document.getElementById('gog-panel').classList.toggle('hidden')"
+          class="text-sm px-4 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-300 hover:text-amber-400 transition"
+        >Connect</button>
+        {% endif %}
+      </div>
+
+      {% if not (gog_connected and not gog_auth_expired) %}
+      <div id="gog-panel" class="hidden border-t border-zinc-800 px-5 py-5">
+
+        {% if gog_auth_expired %}
+        <div class="bg-zinc-800 border border-amber-700 rounded-lg p-3 mb-4 text-sm text-amber-300">
+          Your GOG session has expired. Follow the steps below to reconnect.
+        </div>
+        {% endif %}
+
+        {% if error == 'gog_no_code' %}
+        <div class="bg-zinc-800 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-400">
+          Couldn't find an authorisation code in that URL. Copy the full URL from your browser and try again.
+        </div>
+        {% elif error == 'gog_token_failed' %}
+        <div class="bg-zinc-800 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-400">
+          Token exchange with GOG failed. Try again from Step 1.
+        </div>
+        {% endif %}
+
+        <div class="space-y-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">1</div>
+            <div>
+              <p class="text-gray-200 text-sm font-medium">Open the GOG login page</p>
+              <p class="text-zinc-500 text-xs mt-0.5 mb-2">Sign in, then copy the redirect URL from your browser bar.</p>
+              <a href="/auth/gog" target="_blank"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 text-sm rounded-lg transition">
+                Open GOG Login &nearr;
+              </a>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">2</div>
+            <div class="w-full">
+              <p class="text-gray-200 text-sm font-medium mb-2">Paste the redirect URL</p>
+              <form method="POST" action="/auth/gog/connect" class="flex gap-2">
+                <input type="text" name="callback_url"
+                  placeholder="https://embed.gog.com/on_login_success?origin=client&code=..."
+                  required
+                  class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono" />
+                <button type="submit"
+                  class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition whitespace-nowrap">
+                  Connect
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if gog_just_connected %}
+      <div class="border-t border-zinc-800 px-5 py-3 bg-zinc-800/40">
+        <p class="text-sm text-green-400">GOG connected successfully.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- PlayStation                                                           -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4">
+        <div>
+          <p class="text-gray-200 font-medium">PlayStation Network</p>
+          <p class="text-zinc-500 text-xs mt-0.5">Adds your PS4/PS5 library and trophy data</p>
+        </div>
+        {% if psn_connected and not psn_auth_expired %}
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <span class="text-sm text-green-400">Connected</span>
+        </div>
+        {% else %}
+        <button
+          onclick="document.getElementById('psn-panel').classList.toggle('hidden')"
+          class="text-sm px-4 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-300 hover:text-amber-400 transition">
+          Connect
+        </button>
+        {% endif %}
+      </div>
+
+      {% if not (psn_connected and not psn_auth_expired) %}
+      <div id="psn-panel" class="hidden border-t border-zinc-800 px-5 py-5">
+
+        {% if psn_auth_expired %}
+        <div class="bg-zinc-800 border border-amber-700 rounded-lg p-3 mb-4 text-sm text-amber-300">
+          Your PlayStation session has expired. Follow the steps below to reconnect.
+        </div>
+        {% endif %}
+
+        {% if error == 'psn_empty_token' %}
+        <div class="bg-zinc-800 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-400">
+          The token field was empty. Paste your NPSSO token and try again.
+        </div>
+        {% endif %}
+
+        <div class="space-y-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">1</div>
+            <div>
+              <p class="text-gray-200 text-sm font-medium">Log into PlayStation.com</p>
+              <p class="text-zinc-500 text-xs mt-0.5">
+                <a href="https://www.playstation.com" target="_blank" class="text-amber-400 underline hover:text-amber-300">Open playstation.com</a>
+                and sign in with your PSN account.
+              </p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">2</div>
+            <div>
+              <p class="text-gray-200 text-sm font-medium">Open the token page</p>
+              <p class="text-zinc-500 text-xs mt-0.5 mb-2">While logged in, open the link below. You'll see a JSON response — select all and copy it.</p>
+              <a href="https://ca.account.sony.com/api/v1/ssocookie" target="_blank"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 text-sm rounded-lg transition">
+                Open Token Page &nearr;
+              </a>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">3</div>
+            <div class="w-full">
+              <p class="text-gray-200 text-sm font-medium mb-2">Paste the response</p>
+              <form method="POST" action="/auth/psn/connect" class="flex gap-2">
+                <input type="text" name="npsso"
+                  placeholder='{"npsso":"...","expires_in":...} or just the token'
+                  required
+                  class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono" />
+                <button type="submit"
+                  class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition whitespace-nowrap">
+                  Connect
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if psn_just_connected %}
+      <div class="border-t border-zinc-800 px-5 py-3 bg-zinc-800/40">
+        <p class="text-sm text-green-400">
+          PlayStation connected
+          {% if psn_npsso_expires_at %} — token expires <span data-utc="{{ psn_npsso_expires_at }}">{{ psn_npsso_expires_at[:10] }}</span>{% endif %}.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ------------------------------------------------------------------ -->
+    <!-- Nintendo Switch                                                      -->
+    <!-- ------------------------------------------------------------------ -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-4">
+        <div>
+          <p class="text-gray-200 font-medium">Nintendo Switch</p>
+          <p class="text-zinc-500 text-xs mt-0.5">Adds your Switch play history (requires Parental Controls app)</p>
+        </div>
+        {% if switch_connected and not switch_auth_expired %}
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <span class="text-sm text-green-400">Connected</span>
+        </div>
+        {% else %}
+        <button
+          onclick="document.getElementById('switch-panel').classList.toggle('hidden')"
+          class="text-sm px-4 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-amber-500 text-zinc-300 hover:text-amber-400 transition">
+          Connect
+        </button>
+        {% endif %}
+      </div>
+
+      {% if not (switch_connected and not switch_auth_expired) %}
+      <div id="switch-panel" class="hidden border-t border-zinc-800 px-5 py-5">
+
+        {% if switch_auth_expired %}
+        <div class="bg-zinc-800 border border-amber-700 rounded-lg p-3 mb-4 text-sm text-amber-300">
+          Your Nintendo session has expired. Follow the steps below to reconnect.
+        </div>
+        {% endif %}
+
+        {% if error == 'switch_no_code' %}
+        <div class="bg-zinc-800 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-400">
+          Couldn't find a session token code in that URL. Copy the full URL from your browser and try again.
+        </div>
+        {% elif error == 'switch_token_failed' %}
+        <div class="bg-zinc-800 border border-red-700 rounded-lg p-3 mb-4 text-sm text-red-400">
+          Token exchange with Nintendo failed. Try again from Step 1.
+        </div>
+        {% endif %}
+
+        <div class="space-y-5">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">1</div>
+            <div>
+              <p class="text-gray-200 text-sm font-medium">Open the Nintendo login page and sign in</p>
+              <p class="text-zinc-500 text-xs mt-0.5 mb-2">
+                You'll reach a <strong class="text-zinc-300">"Select this person"</strong> screen.
+                <strong class="text-zinc-300">Do not click the button</strong> — right-click it instead.
+              </p>
+              <a href="/auth/switch" target="_blank"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 text-sm rounded-lg transition">
+                Open Nintendo Login &nearr;
+              </a>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">2</div>
+            <div class="w-full">
+              <p class="text-gray-200 text-sm font-medium mb-1">Right-click "Select this person" → Copy link address</p>
+              <p class="text-zinc-500 text-xs mb-2">The URL starts with <code class="text-zinc-400">npf54789befb391a838://auth#</code>. Paste it below.</p>
+              <form method="POST" action="/auth/switch/connect" class="flex gap-2">
+                <input type="text" name="redirect_url"
+                  placeholder="npf54789befb391a838://auth#session_token_code=..."
+                  required
+                  class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono" />
+                <button type="submit"
+                  class="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition whitespace-nowrap">
+                  Connect
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if switch_just_connected %}
+      <div class="border-t border-zinc-800 px-5 py-3 bg-zinc-800/40">
+        <p class="text-sm text-green-400">Nintendo Switch connected successfully.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Finish -->
+  <div class="flex items-center justify-between">
+    <p class="text-zinc-600 text-sm">Steam is already connected — you can finish now and add more services later.</p>
+    <form method="POST" action="/wizard/complete">
+      <button
+        type="submit"
+        class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+      >
+        Finish Setup →
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}SteamPunk — Sign In{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[70vh]">
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-10 w-full max-w-sm text-center shadow-2xl">
+
+    <h1 class="text-3xl font-bold text-amber-400 tracking-wide mb-1">SteamPunk</h1>
+    <p class="text-zinc-500 text-sm mb-8">Your personal game intelligence</p>
+
+    {% if request.query_params.get('error') %}
+    <p class="text-red-400 text-sm mb-6">Authentication failed. Please try again.</p>
+    {% endif %}
+
+    <a href="/auth/steam">
+      <img
+        src="https://community.fastly.steamstatic.com/public/images/signinthroughsteam/sits_01.png"
+        alt="Sign in through Steam"
+        class="mx-auto hover:opacity-90 transition"
+      />
+    </a>
+
+    <p class="text-zinc-600 text-xs mt-8">
+      Runs locally &mdash; your data never leaves this machine.
+    </p>
+  </div>
+</div>
+{% endblock %}

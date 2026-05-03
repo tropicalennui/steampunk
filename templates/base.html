@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SteamPunk{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            steam: { DEFAULT: '#1b2838', light: '#2a475e', dark: '#171a21' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full bg-zinc-950 text-gray-200 font-sans">
+
+  {% if user %}
+  <nav class="bg-zinc-900 border-b border-zinc-800">
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
+
+      <a href="/library" class="text-amber-400 font-semibold tracking-wide text-lg hover:text-amber-300">
+        SteamPunk
+      </a>
+
+      {% if last_synced is defined %}
+      <span class="text-xs text-zinc-500 hidden sm:block">
+        Last synced: {% if last_synced %}<span data-utc="{{ last_synced }}">{{ last_synced }}</span>{% else %}never{% endif %}
+      </span>
+      {% endif %}
+
+      <!-- Nav dropdown -->
+      <div class="relative" id="nav-menu">
+        <button
+          onclick="document.getElementById('nav-dropdown').classList.toggle('hidden')"
+          class="flex items-center gap-2 rounded-md px-3 py-1.5 hover:bg-zinc-800 transition"
+        >
+          {% if user.avatar %}
+          <img src="{{ user.avatar }}" class="w-7 h-7 rounded-full" alt="" />
+          {% endif %}
+          <span class="text-sm text-gray-300">{{ user.name }}</span>
+          <svg class="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        <div id="nav-dropdown" class="hidden absolute right-0 mt-1 w-44 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50">
+          <a href="/library" class="block px-4 py-2 text-sm hover:bg-zinc-700 rounded-t-md">Games List</a>
+          <a href="/profile" class="block px-4 py-2 text-sm hover:bg-zinc-700">User Profile</a>
+          <a href="/preferences" class="block px-4 py-2 text-sm hover:bg-zinc-700">Preferences</a>
+          <a href="/setup" class="block px-4 py-2 text-sm hover:bg-zinc-700">Setup</a>
+          <a href="/logs" class="block px-4 py-2 text-sm hover:bg-zinc-700">Sync Logs</a>
+          <hr class="border-zinc-700 my-1" />
+          <a href="/logout" class="block px-4 py-2 text-sm text-red-400 hover:bg-zinc-700 rounded-b-md">Logout</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const menu = document.getElementById('nav-menu');
+      if (menu && !menu.contains(e.target)) {
+        document.getElementById('nav-dropdown')?.classList.add('hidden');
+      }
+    });
+
+    // Convert all [data-utc] elements from UTC to the configured timezone
+    document.addEventListener('DOMContentLoaded', function() {
+      const tz = "{{ timezone | default('UTC') }}";
+      document.querySelectorAll('[data-utc]').forEach(function(el) {
+        const raw = el.dataset.utc;
+        if (!raw) return;
+        try {
+          const d = new Date(raw.endsWith('Z') ? raw : raw.replace(' ', 'T') + 'Z');
+          el.textContent = new Intl.DateTimeFormat('en', {
+            timeZone: tz,
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          }).format(d);
+        } catch(e) {}
+      });
+    });
+  </script>
+
+</body>
+</html>

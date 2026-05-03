@@ -1,5 +1,11 @@
+# ─── Database & logs ───────────────────────────────────────────────────────────
+steampunk.duckdb
+steampunk.duckdb.wal
+logs/
+
 # ─── Secrets ───────────────────────────────────────────────────────────────────
 gandalf.json
+src/bundled_credentials.py
 *.secret
 *.secrets
 *.key
@@ -53,3 +59,9 @@ __pycache__/
 dist/
 build/
 .cache/
+
+# ─── Obsidian vault ───────────────────────────────────
+SteamPunkVault/.obsidian
+SteamPunkVault/Ideas
+SteamPunkVault/Stories
+SteamPunkVault/zArchive

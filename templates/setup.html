@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% block title %}Setup — SteamPunk{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+  <h1 class="text-2xl font-bold text-amber-400 mb-6">Setup</h1>
+
+  <!-- Tab bar -->
+  <div class="flex gap-1 border-b border-zinc-800 mb-8">
+    <button
+      onclick="switchTab('steam')"
+      id="tab-steam"
+      class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
+    >Steam</button>
+    <button
+      onclick="switchTab('gog')"
+      id="tab-gog"
+      class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
+    >GOG</button>
+    <button
+      onclick="switchTab('psn')"
+      id="tab-psn"
+      class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
+    >PlayStation</button>
+    <button
+      onclick="switchTab('switch')"
+      id="tab-switch"
+      class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
+    >Nintendo Switch</button>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Steam tab                                                            -->
+  <!-- ------------------------------------------------------------------ -->
+  <div id="panel-steam" class="tab-panel">
+
+    <p class="text-zinc-400 text-sm mb-8">
+      To access your library without making your Steam profile public, SteamPunk needs your
+      Steam session cookie. This is a read-only token — it is <strong class="text-white">never used
+      to perform any action</strong> on your account.
+    </p>
+
+    {% if already_configured %}
+    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-8 text-sm text-amber-300">
+      A session cookie is already saved. Paste a new one below to replace it.
+    </div>
+    {% endif %}
+
+    {% if error == 'invalid' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-8 text-sm text-red-400">
+      That cookie didn't work — Steam returned an empty library response. Double-check you copied
+      the full value from the correct cookie and try again.
+    </div>
+    {% endif %}
+
+    <div class="space-y-6 mb-10">
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+        <div>
+          <p class="text-gray-200 font-medium">Make sure you're logged into Steam in this browser</p>
+          <p class="text-zinc-500 text-sm mt-0.5">
+            You just signed in via the login page, so you should be. If not,
+            <a href="https://store.steampowered.com/login/" target="_blank" class="text-amber-400 underline hover:text-amber-300">log in at store.steampowered.com</a>
+            first.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+        <div>
+          <p class="text-gray-200 font-medium">Open your browser's DevTools</p>
+          <div class="flex gap-3 mt-1.5">
+            <span class="text-xs px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Windows / Linux: <kbd class="text-amber-400">F12</kbd></span>
+            <span class="text-xs px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300">Mac: <kbd class="text-amber-400">⌘ + Option + I</kbd></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">3</div>
+        <div>
+          <p class="text-gray-200 font-medium">Navigate to the Cookies panel</p>
+          <div class="mt-2 space-y-2">
+            <div class="bg-zinc-800 border border-zinc-700 rounded p-3 text-sm">
+              <p class="text-amber-400 font-medium mb-1">Chrome / Edge</p>
+              <p class="text-zinc-300">
+                Click <strong>Application</strong> tab →
+                expand <strong>Cookies</strong> in the left sidebar →
+                click <strong>https://steamcommunity.com</strong>
+              </p>
+            </div>
+            <div class="bg-zinc-800 border border-zinc-700 rounded p-3 text-sm">
+              <p class="text-amber-400 font-medium mb-1">Firefox</p>
+              <p class="text-zinc-300">
+                Click <strong>Storage</strong> tab →
+                expand <strong>Cookies</strong> →
+                click <strong>https://steamcommunity.com</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">4</div>
+        <div>
+          <p class="text-gray-200 font-medium">Find and copy the <code class="text-amber-400 bg-zinc-800 px-1.5 py-0.5 rounded text-sm">steamLoginSecure</code> cookie</p>
+          <p class="text-zinc-500 text-sm mt-0.5">
+            Look for a row named <strong class="text-zinc-300">steamLoginSecure</strong>.
+            Click it, then copy the entire <strong class="text-zinc-300">Value</strong>
+            — it's a long string that starts with your SteamID followed by
+            <code class="text-zinc-400">%7C%7C</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">5</div>
+        <div class="w-full">
+          <p class="text-gray-200 font-medium mb-3">Paste the cookie value below</p>
+          <form method="POST" action="/setup">
+            <textarea
+              name="session_cookie"
+              rows="3"
+              placeholder="76561198072286781%7C%7C..."
+              required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono resize-none"
+            ></textarea>
+            <div class="flex items-center justify-between mt-3">
+              <p class="text-zinc-600 text-xs">
+                Stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
+                Only used for read requests.
+              </p>
+              <button
+                type="submit"
+                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+              >
+                Save &amp; Continue
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    {% if already_configured %}
+    <div class="text-center">
+      <a href="/library" class="text-zinc-500 text-sm hover:text-zinc-300">Skip — keep existing cookie</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- GOG tab                                                              -->
+  <!-- ------------------------------------------------------------------ -->
+  <div id="panel-gog" class="tab-panel hidden">
+
+    <p class="text-zinc-400 text-sm mb-6">
+      Connect your GOG account to include your GOG library in the unified games view.
+      SteamPunk stores only an access token — no password is ever seen or stored.
+    </p>
+
+    {% if error == 'gog_no_credentials' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      GOG client credentials are not configured in <code>gandalf.json</code>. Add
+      <code>gog.client_id</code> and <code>gog.client_secret</code> before connecting.
+    </div>
+    {% elif error == 'gog_no_code' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Couldn't find an authorisation code in that URL. Make sure you copied the full URL
+      from your browser bar after the GOG login page redirected you.
+    </div>
+    {% elif error == 'gog_token_failed' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Token exchange with GOG failed. The code may have expired — try again from Step 1.
+    </div>
+    {% endif %}
+
+    {% if gog_auth_expired %}
+    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-6 text-sm text-amber-300">
+      Your GOG session has expired. Follow the steps below to reconnect.
+    </div>
+    {% endif %}
+
+    {% if gog_just_connected %}
+    <div class="bg-zinc-800 border border-green-700 rounded-lg p-4 mb-6 text-sm text-green-400">
+      GOG connected successfully. Run a sync to import your GOG library.
+    </div>
+    {% endif %}
+
+    {% if gog_connected and not gog_auth_expired %}
+    <!-- Connected state -->
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div class="flex items-center gap-3">
+        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        <span class="text-sm text-gray-200">GOG account connected</span>
+      </div>
+      <form method="POST" action="/auth/gog/disconnect">
+        <button
+          type="submit"
+          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
+        >
+          Disconnect
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <!-- Two-step connect flow -->
+    <div class="space-y-8">
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+        <div>
+          <p class="text-gray-200 font-medium">Open the GOG login page</p>
+          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
+            Sign in with your GOG account. After approving access, GOG will redirect you
+            to a page at <code class="text-zinc-400">embed.gog.com</code>.
+          </p>
+          <a
+            href="/auth/gog"
+            target="_blank"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 font-medium text-sm rounded-lg transition"
+          >
+            Open GOG Login &nearr;
+          </a>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+        <div class="w-full">
+          <p class="text-gray-200 font-medium">Paste the redirect URL</p>
+          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
+            After the GOG page loads, copy the <strong class="text-zinc-300">full URL</strong>
+            from your browser's address bar and paste it below.
+            It should start with
+            <code class="text-zinc-400">https://embed.gog.com/on_login_success</code>.
+          </p>
+          <form method="POST" action="/auth/gog/connect">
+            <input
+              type="text"
+              name="callback_url"
+              placeholder="https://embed.gog.com/on_login_success?origin=client&code=..."
+              required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono"
+            />
+            <div class="flex justify-end mt-3">
+              <button
+                type="submit"
+                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+              >
+                Connect
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- PSN tab                                                            -->
+  <!-- ------------------------------------------------------------------ -->
+  <div id="panel-psn" class="tab-panel hidden">
+
+    <p class="text-zinc-400 text-sm mb-6">
+      Connect your PlayStation Network account to include your PS4/PS5 library and trophy data
+      in the unified games view. SteamPunk only stores an NPSSO session token — your password
+      is never seen or stored.
+    </p>
+
+    {% if error == 'psn_empty_token' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      The token field was empty. Paste your NPSSO token and try again.
+    </div>
+    {% endif %}
+
+    {% if psn_auth_expired %}
+    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-6 text-sm text-amber-300">
+      Your PlayStation session has expired. Follow the steps below to reconnect.
+    </div>
+    {% endif %}
+
+    {% if psn_just_connected %}
+    <div class="bg-zinc-800 border border-green-700 rounded-lg p-4 mb-6 text-sm text-green-400">
+      PlayStation connected successfully. Run a sync to import your library.
+    </div>
+    {% endif %}
+
+    {% if psn_connected and not psn_auth_expired %}
+    <!-- Connected state -->
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div class="flex items-center gap-3">
+        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        <div>
+          <span class="text-sm text-gray-200">PlayStation account connected</span>
+          {% if psn_npsso_expires_at %}
+          <p class="text-xs text-zinc-500 mt-0.5">
+            Session token expires <span data-utc="{{ psn_npsso_expires_at }}">{{ psn_npsso_expires_at[:10] }}</span>
+          </p>
+          {% endif %}
+        </div>
+      </div>
+      <form method="POST" action="/auth/psn/disconnect">
+        <button
+          type="submit"
+          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
+        >
+          Disconnect
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="space-y-8">
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+        <div>
+          <p class="text-gray-200 font-medium">Log into PlayStation.com in this browser</p>
+          <p class="text-zinc-500 text-sm mt-0.5">
+            <a href="https://www.playstation.com" target="_blank" class="text-amber-400 underline hover:text-amber-300">Open playstation.com</a>
+            and sign in with your PSN account if you aren't already.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+        <div>
+          <p class="text-gray-200 font-medium">Open the token page</p>
+          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
+            While logged in, click the button below. You'll see a JSON response — select all and copy it.
+          </p>
+          <a
+            href="https://ca.account.sony.com/api/v1/ssocookie"
+            target="_blank"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 font-medium text-sm rounded-lg transition"
+          >
+            Open Token Page &nearr;
+          </a>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">3</div>
+        <div class="w-full">
+          <p class="text-gray-200 font-medium mb-1">Paste the response below</p>
+          <p class="text-zinc-500 text-sm mb-3">Paste the whole JSON — SteamPunk will extract the token automatically.</p>
+          <form method="POST" action="/auth/psn/connect">
+            <input
+              type="text"
+              name="npsso"
+              placeholder='{"npsso":"...","expires_in":...} or just the token'
+              required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono"
+            />
+            <div class="flex items-center justify-between mt-3">
+              <p class="text-zinc-600 text-xs">
+                Stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
+              </p>
+              <button
+                type="submit"
+                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+              >
+                Connect
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Nintendo Switch tab                                                -->
+  <!-- ------------------------------------------------------------------ -->
+  <div id="panel-switch" class="tab-panel hidden">
+
+    <p class="text-zinc-400 text-sm mb-4">
+      Connect your Nintendo account to include your Switch play history in the unified library.
+      SteamPunk stores only a long-lived session token — your password is never seen or stored.
+    </p>
+    <div class="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-6 text-sm">
+      <p class="text-zinc-300 font-medium mb-1">Prerequisite: Nintendo Switch Parental Controls app</p>
+      <p class="text-zinc-500">
+        Play history is read from Nintendo's Parental Controls API. Your Switch must be
+        linked to the <strong class="text-zinc-300">Nintendo Switch Parental Controls</strong>
+        app on your phone before syncing will return any data.
+        If you haven't done this yet, install the app, register your console, then come back here.
+      </p>
+    </div>
+
+    {% if error == 'switch_no_code' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Couldn't find a session token code in that URL. Make sure you copied the full URL
+      from your browser's address bar after the Nintendo login page redirected you.
+    </div>
+    {% elif error == 'switch_token_failed' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Token exchange with Nintendo failed. The code may have expired — try again from Step 1.
+    </div>
+    {% endif %}
+
+    {% if switch_auth_expired %}
+    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-6 text-sm text-amber-300">
+      Your Nintendo session has expired. Follow the steps below to reconnect.
+    </div>
+    {% endif %}
+
+    {% if switch_just_connected %}
+    <div class="bg-zinc-800 border border-green-700 rounded-lg p-4 mb-6 text-sm text-green-400">
+      Nintendo Switch connected successfully. Run a sync to import your library.
+    </div>
+    {% endif %}
+
+    {% if switch_connected and not switch_auth_expired %}
+    <!-- Connected state -->
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div class="flex items-center gap-3">
+        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        <span class="text-sm text-gray-200">Nintendo account connected</span>
+      </div>
+      <form method="POST" action="/auth/switch/disconnect">
+        <button
+          type="submit"
+          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
+        >
+          Disconnect
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="space-y-8">
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+        <div>
+          <p class="text-gray-200 font-medium">Open the Nintendo login page and sign in</p>
+          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
+            You'll reach a <strong class="text-zinc-300">"Select this person"</strong> screen.
+            <strong class="text-zinc-300">Do not click that button.</strong>
+          </p>
+          <a
+            href="/auth/switch"
+            target="_blank"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 font-medium text-sm rounded-lg transition"
+          >
+            Open Nintendo Login &nearr;
+          </a>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+        <div class="w-full">
+          <p class="text-gray-200 font-medium">Right-click "Select this person" and copy the link</p>
+          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
+            <strong class="text-zinc-300">Right-click</strong> (or long-press) the
+            <strong class="text-zinc-300">"Select this person"</strong> button and choose
+            <strong class="text-zinc-300">Copy link address</strong>.
+            The URL starts with <code class="text-zinc-400">npf54789befb391a838://auth#</code>.
+            Paste it below.
+          </p>
+          <form method="POST" action="/auth/switch/connect">
+            <input
+              type="text"
+              name="redirect_url"
+              placeholder="npf54789befb391a838://auth#session_state=...&amp;session_token_code=..."
+              required
+              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono"
+            />
+            <div class="flex items-center justify-between mt-3">
+              <p class="text-zinc-600 text-xs">
+                Stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
+              </p>
+              <button
+                type="submit"
+                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+              >
+                Connect
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  const ACTIVE   = ['border-amber-500', 'text-amber-400'];
+  const INACTIVE = ['border-transparent', 'text-zinc-500', 'hover:text-zinc-300'];
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove(...ACTIVE);
+      b.classList.add(...INACTIVE);
+    });
+    document.getElementById('panel-' + name).classList.remove('hidden');
+    const btn = document.getElementById('tab-' + name);
+    btn.classList.remove(...INACTIVE);
+    btn.classList.add(...ACTIVE);
+  }
+
+  // On load: open the tab that has something to show, defaulting to Steam
+  const initialTab =
+    {% if error in ('switch_no_code', 'switch_token_failed') or switch_auth_expired or switch_just_connected %}'switch'
+    {% elif error in ('psn_empty_token',) or psn_auth_expired or psn_just_connected %}'psn'
+    {% elif error in ('gog_no_credentials', 'gog_no_code', 'gog_token_failed') or gog_auth_expired or gog_just_connected %}'gog'
+    {% else %}'steam'
+    {% endif %};
+  switchTab(initialTab);
+</script>
+
+{% endblock %}

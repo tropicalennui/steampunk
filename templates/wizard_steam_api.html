@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Setup — SteamPunk{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto">
+
+  <div class="text-center mb-8">
+    <h1 class="text-3xl font-bold text-amber-400 tracking-wide mb-1">SteamPunk</h1>
+    <p class="text-zinc-500 text-sm">Let's get your library connected.</p>
+  </div>
+
+  <!-- Step progress -->
+  <div class="flex items-center justify-center gap-3 text-sm mb-10">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-amber-500 text-zinc-950 font-bold text-xs flex items-center justify-center">1</div>
+      <span class="text-amber-400 font-medium">Steam Setup</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-zinc-700 text-zinc-400 font-bold text-xs flex items-center justify-center">2</div>
+      <span class="text-zinc-600">Session Cookie</span>
+    </div>
+    <span class="text-zinc-700">›</span>
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-zinc-700 text-zinc-400 font-bold text-xs flex items-center justify-center">3</div>
+      <span class="text-zinc-600">Other Services</span>
+    </div>
+  </div>
+
+  <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+
+    <h2 class="text-lg font-semibold text-gray-200 mb-1">Connect Steam</h2>
+    <p class="text-zinc-400 text-sm mb-6">
+      SteamPunk needs your Steam API key to read your library. This key is stored only on
+      this machine and is never shared.
+    </p>
+
+    {% if error == 'invalid' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Couldn't validate those credentials. Check that your API key is correct and that the
+      vanity URL or Steam ID matches your account, then try again.
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/wizard/steam-api" class="space-y-5">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1.5">Steam API Key</label>
+        <input
+          type="text"
+          name="api_key"
+          value="{{ api_key }}"
+          placeholder="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+          required
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1.5">Steam Vanity URL or Steam ID64</label>
+        <input
+          type="text"
+          name="vanity_id"
+          value="{{ vanity_id }}"
+          placeholder="your_steam_username or 76561198012345678"
+          required
+          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600"
+        />
+        <p class="text-zinc-600 text-xs mt-1.5">
+          Your vanity URL is the custom part of your Steam profile link, e.g.
+          <code class="text-zinc-500">steamcommunity.com/id/<strong>this_part</strong></code>
+        </p>
+      </div>
+
+      <!-- How to get your API key (expandable) -->
+      <div class="border border-zinc-800 rounded-lg overflow-hidden">
+        <button
+          type="button"
+          onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('svg').classList.toggle('rotate-180')"
+          class="w-full flex items-center justify-between px-4 py-3 text-sm text-zinc-400 hover:text-gray-200 hover:bg-zinc-800 transition text-left"
+        >
+          <span>How do I get a Steam API key?</span>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div class="hidden px-4 pb-4 pt-2 bg-zinc-800/50 text-sm text-zinc-400 space-y-2">
+          <p>1. Go to <a href="https://steamcommunity.com/dev/apikey" target="_blank" class="text-amber-400 underline hover:text-amber-300">steamcommunity.com/dev/apikey</a></p>
+          <p>2. Log in with your Steam account if prompted.</p>
+          <p>3. Enter any domain name (e.g. <code class="text-zinc-300">localhost</code>) and click Register.</p>
+          <p>4. Copy the key shown and paste it above.</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button
+          type="submit"
+          class="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+        >
+          Continue →
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+{% endblock %}

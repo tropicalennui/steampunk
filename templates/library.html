@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}Games Library — SteamPunk{% endblock %}
+
+{% block content %}
+
+<!-- Header row -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-amber-400">Games Library</h1>
+    <p class="text-zinc-500 text-sm mt-0.5">{{ games|length }} games</p>
+  </div>
+
+  <div class="flex items-center gap-3 flex-wrap">
+    {% if sync_running %}
+    <span class="text-xs text-amber-400 animate-pulse">Syncing&hellip;</span>
+    {% endif %}
+
+    <!-- Sync split-button -->
+    <form method="POST" action="/sync" id="sync-form">
+      <input type="hidden" name="platforms" id="sync-platforms" value="all" />
+      <div class="relative flex items-center" id="sync-menu">
+        <button
+          type="submit"
+          class="text-xs px-3 py-1.5 rounded-l bg-zinc-800 border border-zinc-700 border-r-0 hover:border-amber-600 text-zinc-300 hover:text-amber-400 transition"
+          {% if sync_running %}disabled{% endif %}
+        >Sync Now</button>
+        <button
+          type="button"
+          onclick="document.getElementById('sync-dropdown').classList.toggle('hidden')"
+          class="text-xs px-1.5 py-1.5 rounded-r bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition"
+          {% if sync_running %}disabled{% endif %}
+        >&#9660;</button>
+        <div id="sync-dropdown" class="hidden absolute top-full right-0 mt-1 w-36 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50">
+          <button type="button" onclick="submitSync('all')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-t-md">All platforms</button>
+          <button type="button" onclick="submitSync('steam')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Steam only</button>
+          <button type="button" onclick="submitSync('gog')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">GOG only</button>
+          <button type="button" onclick="submitSync('psn')"    class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">PlayStation only</button>
+          <button type="button" onclick="submitSync('switch')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">Nintendo Switch only</button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Show hidden toggle -->
+    {% if show_hidden %}
+    <a
+      href="/library"
+      class="text-xs px-3 py-1.5 rounded bg-zinc-700 border border-zinc-500 text-zinc-200 hover:border-amber-600 transition"
+    >
+      Hide hidden
+    </a>
+    {% else %}
+    <a
+      href="/library?show_hidden=true"
+      class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300 transition"
+    >
+      Show hidden
+    </a>
+    {% endif %}
+
+    <input
+      id="search"
+      type="text"
+      placeholder="Search by name or genre&hellip;"
+      class="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 w-56"
+      oninput="applyFilters()"
+    />
+  </div>
+</div>
+
+<!-- Platform filter pills -->
+{% if games %}
+<div class="flex flex-wrap gap-2 mb-6" id="platform-filters">
+  <button onclick="setPlatformFilter('all',    this)" class="filter-pill active-pill" data-filter="all">All</button>
+  <button onclick="setPlatformFilter('steam',  this)" class="filter-pill" data-filter="steam">Steam</button>
+  <button onclick="setPlatformFilter('gog',    this)" class="filter-pill" data-filter="gog">GOG</button>
+  <button onclick="setPlatformFilter('psn',    this)" class="filter-pill" data-filter="psn">PlayStation</button>
+  <button onclick="setPlatformFilter('switch', this)" class="filter-pill" data-filter="switch">Nintendo Switch</button>
+  <button onclick="setPlatformFilter('multi',  this)" class="filter-pill" data-filter="multi">Multi-platform</button>
+</div>
+{% endif %}
+
+<style>
+  .filter-pill {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(63 63 70);
+    color: rgb(161 161 170);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-pill:hover { border-color: rgb(217 119 6); color: rgb(251 191 36); }
+  .active-pill { border-color: rgb(217 119 6) !important; color: rgb(251 191 36) !important; background: rgb(28 25 23); }
+</style>
+
+{% if not games %}
+<div class="text-center py-24 text-zinc-500">
+  <p class="text-lg mb-2">No library data yet.</p>
+  <p class="text-sm">Click <strong class="text-zinc-300">Sync Now</strong> or run <code class="text-amber-400">python src/collect.py</code> to import your library.</p>
+</div>
+{% else %}
+
+<!-- Game grid -->
+<div id="game-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+  {% for game in games %}
+  <div
+    class="game-card bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition group relative {% if game.hidden %}opacity-40 border-dashed{% elif game.never_launched %}opacity-50{% endif %}"
+    data-title="{{ game.title | lower }}"
+    data-genres="{{ game.genres | join(' ') | lower }}"
+    data-platforms="{{ game.platforms | join(' ') | lower }}"
+    data-game-id="{{ game.game_id }}"
+  >
+    <!-- Cover image -->
+    {% if game.cover_url %}
+    <img src="{{ game.cover_url }}" alt="" class="w-full object-cover aspect-video" loading="lazy" />
+    {% else %}
+    <div class="w-full aspect-video bg-zinc-800 flex items-center justify-center">
+      <span class="text-zinc-600 text-xs">No image</span>
+    </div>
+    {% endif %}
+
+    <!-- Action buttons (rating + hide) — visible on hover -->
+    <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <!-- Thumbs up -->
+      <button
+        onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'up', this)"
+        class="w-6 h-6 rounded flex items-center justify-center text-xs transition
+               {% if game.rating == 'up' %}bg-green-600 text-white{% else %}bg-zinc-800/80 text-zinc-400 hover:text-green-400{% endif %}"
+        title="Thumbs up"
+      >&#128077;</button>
+      <!-- Thumbs down -->
+      <button
+        onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'down', this)"
+        class="w-6 h-6 rounded flex items-center justify-center text-xs transition
+               {% if game.rating == 'down' %}bg-red-700 text-white{% else %}bg-zinc-800/80 text-zinc-400 hover:text-red-400{% endif %}"
+        title="Thumbs down"
+      >&#128078;</button>
+      <!-- Hide -->
+      <button
+        onclick="setHidden({{ game.game_id }}, {{ 'true' if not game.hidden else 'false' }}, this.closest('.game-card'))"
+        class="w-6 h-6 rounded flex items-center justify-center text-xs bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition"
+        title="{{ 'Unhide' if game.hidden else 'Hide' }}"
+      >{% if game.hidden %}&#128065;{% else %}&#128065;&#65038;{% endif %}</button>
+    </div>
+
+    <div class="p-3">
+      <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white" title="{{ game.title }}">
+        {{ game.title }}
+      </p>
+
+      <!-- Platform badges -->
+      {% if game.platforms %}
+      <div class="flex flex-wrap gap-1 mt-1.5">
+        {% for platform in game.platforms %}
+        <span class="text-[9px] px-1.5 py-0.5 rounded font-medium
+          {% if platform == 'steam' %}bg-blue-900/60 text-blue-300 border border-blue-800
+          {% elif platform == 'gog' %}bg-purple-900/60 text-purple-300 border border-purple-800
+          {% elif platform == 'switch' %}bg-red-900/60 text-red-300 border border-red-800
+          {% else %}bg-zinc-800 text-zinc-400 border border-zinc-700{% endif %}">
+          {{ platform | upper }}
+        </span>
+        {% endfor %}
+        {% if game.platforms | length > 1 %}
+        <span class="text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-900/40 text-amber-400 border border-amber-800/60">
+          &#x2715;{{ game.platforms | length }}
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Playtime / never played — shown for Steam and Switch; suppressed for GOG/PSN-only -->
+      <div class="flex items-center justify-between mt-1.5">
+        {% set has_playtime = 'steam' in (game.platforms or []) or 'switch' in (game.platforms or []) %}
+        {% if has_playtime %}
+        <span class="text-xs text-zinc-500">
+          {% if game.playtime_mins and game.playtime_mins > 0 %}
+            {{ (game.playtime_mins / 60) | round(1) }}h
+          {% else %}
+            Never played
+          {% endif %}
+        </span>
+        {% else %}
+        <span class="text-xs text-zinc-600">Playtime unknown</span>
+        {% endif %}
+        {% if game.achievement_pct > 0 %}
+        <span class="text-xs text-amber-600">{{ game.achievement_pct | round(0) | int }}%</span>
+        {% endif %}
+      </div>
+
+      <!-- Genres -->
+      {% if game.genres %}
+      <div class="flex flex-wrap gap-1 mt-2">
+        {% for genre in game.genres[:3] %}
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+          {{ genre }}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Store availability badges -->
+      {% if game.available_on_steam or game.available_on_gog %}
+      <div class="flex flex-wrap gap-1 mt-2">
+        {% if game.available_on_steam %}
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-900">
+          On Steam
+        </span>
+        {% endif %}
+        {% if game.available_on_gog %}
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-900">
+          On GOG
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<p id="no-results" class="hidden text-center py-16 text-zinc-500 text-sm">No games match your search.</p>
+
+{% endif %}
+
+<script>
+  let activePlatformFilter = 'all';
+
+  function setPlatformFilter(filter, btn) {
+    activePlatformFilter = filter;
+    document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active-pill'));
+    btn.classList.add('active-pill');
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.game-card');
+    let visible = 0;
+    cards.forEach(card => {
+      const textMatch = !q || card.dataset.title.includes(q) || card.dataset.genres.includes(q);
+      const platforms = (card.dataset.platforms || '').split(' ').filter(Boolean);
+      let platformMatch = true;
+      if (activePlatformFilter === 'steam')  platformMatch = platforms.includes('steam');
+      else if (activePlatformFilter === 'gog')    platformMatch = platforms.includes('gog');
+      else if (activePlatformFilter === 'psn')    platformMatch = platforms.includes('psn');
+      else if (activePlatformFilter === 'switch') platformMatch = platforms.includes('switch');
+      else if (activePlatformFilter === 'multi')  platformMatch = platforms.length > 1;
+      const show = textMatch && platformMatch;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('no-results').classList.toggle('hidden', visible > 0);
+  }
+
+  function submitSync(platform) {
+    document.getElementById('sync-platforms').value = platform;
+    document.getElementById('sync-dropdown').classList.add('hidden');
+    document.getElementById('sync-form').submit();
+  }
+
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('sync-menu');
+    if (menu && !menu.contains(e.target)) {
+      document.getElementById('sync-dropdown')?.classList.add('hidden');
+    }
+  });
+
+  async function setRating(gameId, currentRating, newRating, btn) {
+    // Toggle off if clicking the active rating
+    const rating = currentRating === newRating ? null : newRating;
+    try {
+      const resp = await fetch(`/library/games/${gameId}/rating`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating }),
+      });
+      if (!resp.ok) return;
+      // Refresh the card's button states
+      const card = btn.closest('.game-card');
+      const [upBtn, downBtn] = card.querySelectorAll('button[onclick*="setRating"]');
+      upBtn.className = upBtn.className.replace(/bg-(green|zinc)-\S+|text-(green|white|zinc)-\S+/g, '');
+      downBtn.className = downBtn.className.replace(/bg-(red|zinc)-\S+|text-(red|white|zinc)-\S+/g, '');
+      if (rating === 'up') {
+        upBtn.classList.add('bg-green-600', 'text-white');
+        downBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
+      } else if (rating === 'down') {
+        downBtn.classList.add('bg-red-700', 'text-white');
+        upBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
+      } else {
+        upBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
+        downBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
+      }
+      // Store new rating in onclick for next toggle
+      upBtn.setAttribute('onclick', `setRating(${gameId}, '${rating ?? ''}', 'up', this)`);
+      downBtn.setAttribute('onclick', `setRating(${gameId}, '${rating ?? ''}', 'down', this)`);
+    } catch (e) {}
+  }
+
+  async function setHidden(gameId, hidden, card) {
+    try {
+      const resp = await fetch(`/library/games/${gameId}/hidden`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden }),
+      });
+      if (!resp.ok) return;
+      if (hidden) {
+        card.classList.add('opacity-40', 'border-dashed');
+        card.classList.remove('opacity-50');
+      } else {
+        card.classList.remove('opacity-40', 'border-dashed');
+      }
+      // Update the hide button's onclick and title
+      const hideBtn = card.querySelector('button[onclick*="setHidden"]');
+      hideBtn.setAttribute('onclick', `setHidden(${gameId}, ${!hidden}, this.closest('.game-card'))`);
+      hideBtn.setAttribute('title', hidden ? 'Unhide' : 'Hide');
+    } catch (e) {}
+  }
+</script>
+
+{% endblock %}

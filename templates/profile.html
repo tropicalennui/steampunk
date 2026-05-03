@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Profile — SteamPunk{% endblock %}
+
+{% block content %}
+
+<div class="flex items-center gap-5 mb-10">
+  {% if user.avatar %}
+  <img src="{{ user.avatar }}" class="w-20 h-20 rounded-full border-2 border-zinc-700" alt="" />
+  {% endif %}
+  <div>
+    <h1 class="text-2xl font-bold text-gray-100">{{ user.name }}</h1>
+    <p class="text-zinc-500 text-sm">Steam account</p>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="grid grid-cols-3 gap-4 mb-10">
+  <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 text-center">
+    <p class="text-3xl font-bold text-amber-400">{{ stats.total_owned or 0 }}</p>
+    <p class="text-zinc-500 text-sm mt-1">Games owned</p>
+  </div>
+  <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 text-center">
+    <p class="text-3xl font-bold text-amber-400">{{ stats.total_hours or 0 }}</p>
+    <p class="text-zinc-500 text-sm mt-1">Hours played</p>
+  </div>
+  <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-5 text-center">
+    <p class="text-3xl font-bold text-zinc-500">{{ stats.never_launched or 0 }}</p>
+    <p class="text-zinc-500 text-sm mt-1">Never launched</p>
+  </div>
+</div>
+
+<!-- Top genres -->
+<div class="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+  <h2 class="text-lg font-semibold text-amber-400 mb-5">Top Genres by Weighted Playtime</h2>
+
+  {% if top_genres %}
+  {% set max_hours = top_genres[0].weighted_hours %}
+  <div class="space-y-4">
+    {% for g in top_genres %}
+    <div>
+      <div class="flex justify-between text-sm mb-1">
+        <span class="text-gray-300">{{ g.name }}</span>
+        <span class="text-zinc-500">{{ g.weighted_hours }}h</span>
+      </div>
+      <div class="w-full bg-zinc-800 rounded-full h-2">
+        <div
+          class="bg-amber-500 h-2 rounded-full"
+          style="width: {{ ((g.weighted_hours / max_hours) * 100) | round(1) }}%"
+        ></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-zinc-500 text-sm">No genre data yet. Sync your library first.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
