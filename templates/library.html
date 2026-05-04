@@ -91,7 +91,6 @@
   <button onclick="setPlatformFilter('steam', this)" class="filter-pill" data-filter="steam">Steam</button>
   <button onclick="setPlatformFilter('gog',   this)" class="filter-pill" data-filter="gog">GOG</button>
   <button onclick="setPlatformFilter('psn',   this)" class="filter-pill" data-filter="psn">PlayStation</button>
-  <button onclick="setPlatformFilter('multi', this)" class="filter-pill" data-filter="multi">Multi-platform</button>
 </div>
 {% endif %}
 
@@ -560,7 +559,6 @@
       if (activePlatformFilter === 'steam') platformMatch = platforms.includes('steam');
       else if (activePlatformFilter === 'gog')   platformMatch = platforms.includes('gog');
       else if (activePlatformFilter === 'psn')   platformMatch = platforms.includes('psn');
-      else if (activePlatformFilter === 'multi') platformMatch = platforms.length > 1;
       const show = textMatch && platformMatch;
       card.style.display = show ? '' : 'none';
       if (show) visible++;
