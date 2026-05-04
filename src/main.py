@@ -111,10 +111,14 @@ def _run_sync(platforms: list[str] | None = None):
 # Column registry for list-view API
 # ---------------------------------------------------------------------------
 
+_GRP_LIB  = "Library data"
+_GRP_PLAT = "Platform data"
+
+
 @dataclass
 class ColumnDef:
     label: str
-    group: str                          # "Library data" | "Platform data"
+    group: str                          # _GRP_LIB | _GRP_PLAT
     platforms: frozenset                # platform slugs that expose this column
     select_sql: Union[str, dict]        # str, or {platform_slug: sql_fragment}
     join_sql: Union[str, dict, None] = None  # str, or {platform_slug: join_clause}
@@ -134,46 +138,46 @@ _J_TAGS       = "LEFT JOIN game_tags gt ON gt.game_id = g.id LEFT JOIN tags tg O
 COLUMN_REGISTRY: dict[str, ColumnDef] = {
     # ── Library data (canonical) ───────────────────────────────────────────────
     "playtime_mins": ColumnDef(
-        label="Playtime (total)", group="Library data",
+        label="Playtime (total)", group=_GRP_LIB,
         platforms=frozenset({"steam", "switch"}),
         select_sql="MAX(l.playtime_mins) AS playtime_mins",
         default=True,
     ),
     "last_played_at": ColumnDef(
-        label="Last played", group="Library data",
+        label="Last played", group=_GRP_LIB,
         platforms=frozenset({"steam"}),
         select_sql="MAX(l.last_played_at) AS last_played_at",
         default=True,
     ),
     "first_played_at": ColumnDef(
-        label="First played", group="Library data",
+        label="First played", group=_GRP_LIB,
         platforms=frozenset({"steam"}),
         select_sql="MAX(l.first_played_at) AS first_played_at",
     ),
     "never_launched": ColumnDef(
-        label="Never launched", group="Library data",
+        label="Never launched", group=_GRP_LIB,
         platforms=frozenset({"steam"}),
         select_sql="bool_and(l.never_launched) AS never_launched",
     ),
     "purchased_at": ColumnDef(
-        label="Purchased at", group="Library data",
+        label="Purchased at", group=_GRP_LIB,
         platforms=frozenset({"steam", "gog", "psn", "switch"}),
         select_sql="MAX(l.purchased_at) AS purchased_at",
     ),
     "purchase_source": ColumnDef(
-        label="Purchase source", group="Library data",
+        label="Purchase source", group=_GRP_LIB,
         platforms=frozenset({"steam", "gog", "psn", "switch"}),
         select_sql="MAX(l.purchase_source) AS purchase_source",
     ),
     # ── Platform data: Steam ───────────────────────────────────────────────────
     "playtime_2weeks": ColumnDef(
-        label="Playtime (last 2 weeks)", group="Platform data",
+        label="Playtime (last 2 weeks)", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="any_value(ssl.playtime_2weeks_mins) AS playtime_2weeks",
         join_sql=_J_STEAM_LIB,
     ),
     "release_date": ColumnDef(
-        label="Release date", group="Platform data",
+        label="Release date", group=_GRP_PLAT,
         platforms=frozenset({"steam", "gog"}),
         select_sql={
             "steam": "any_value(sad.release_date) AS release_date",
@@ -182,33 +186,33 @@ COLUMN_REGISTRY: dict[str, ColumnDef] = {
         join_sql={"steam": _J_STEAM_DET, "gog": _J_GOG},
     ),
     "genres": ColumnDef(
-        label="Genres", group="Platform data",
+        label="Genres", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="list_distinct(list(gn.name)) FILTER (WHERE gn.name IS NOT NULL) AS genres",
         join_sql=_J_GENRES,
         default=True,
     ),
     "tags": ColumnDef(
-        label="Tags", group="Platform data",
+        label="Tags", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="list_distinct(list(tg.name)) FILTER (WHERE tg.name IS NOT NULL) AS tags",
         join_sql=_J_TAGS,
     ),
     "steam_categories": ColumnDef(
-        label="Steam categories", group="Platform data",
+        label="Steam categories", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="any_value(sad.categories) AS steam_categories",
         join_sql=_J_STEAM_DET,
     ),
     "achievement_pct": ColumnDef(
-        label="Achievement %", group="Platform data",
+        label="Achievement %", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="MAX(ach.completion_pct) AS achievement_pct",
         join_sql=_J_ACH,
         default=True,
     ),
     "achievements_count": ColumnDef(
-        label="Achievements (earned/total)", group="Platform data",
+        label="Achievements (earned/total)", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql=(
             "CASE WHEN MAX(ach.total_count) > 0 "
@@ -218,32 +222,32 @@ COLUMN_REGISTRY: dict[str, ColumnDef] = {
         join_sql=_J_ACH,
     ),
     "my_review": ColumnDef(
-        label="My review", group="Platform data",
+        label="My review", group=_GRP_PLAT,
         platforms=frozenset({"steam"}),
         select_sql="any_value(rv.review_text) AS my_review",
         join_sql=_J_REV,
     ),
     # ── Platform data: PSN ────────────────────────────────────────────────────
     "psn_platform": ColumnDef(
-        label="PS Platform (PS4/PS5)", group="Platform data",
+        label="PS Platform (PS4/PS5)", group=_GRP_PLAT,
         platforms=frozenset({"psn"}),
         select_sql="any_value(spsn.platform) AS psn_platform",
         join_sql=_J_PSN,
     ),
     "acquisition_type": ColumnDef(
-        label="Acquisition type", group="Platform data",
+        label="Acquisition type", group=_GRP_PLAT,
         platforms=frozenset({"psn"}),
         select_sql="any_value(spsn.acquisition_type) AS acquisition_type",
         join_sql=_J_PSN,
     ),
     "trophy_pct": ColumnDef(
-        label="Trophy progress %", group="Platform data",
+        label="Trophy progress %", group=_GRP_PLAT,
         platforms=frozenset({"psn"}),
         select_sql="MAX(spsn.trophy_progress) AS trophy_pct",
         join_sql=_J_PSN,
     ),
     "trophies_count": ColumnDef(
-        label="Trophies (earned/defined)", group="Platform data",
+        label="Trophies (earned/defined)", group=_GRP_PLAT,
         platforms=frozenset({"psn"}),
         select_sql=(
             "CASE WHEN MAX(spsn.trophies_defined) > 0 "
@@ -253,6 +257,15 @@ COLUMN_REGISTRY: dict[str, ColumnDef] = {
         join_sql=_J_PSN,
     ),
 }
+
+
+def _resolve_col_sql(col: ColumnDef, platform: Optional[str]) -> tuple[str, str]:
+    """Return (select_expr, join_clause) resolved for the given platform."""
+    sel = col.select_sql if isinstance(col.select_sql, str) else col.select_sql.get(platform or "", "")
+    j   = col.join_sql
+    if isinstance(j, dict):
+        j = j.get(platform or "", "")
+    return sel or "", j or ""
 
 
 def _build_list_query(
@@ -273,18 +286,11 @@ def _build_list_query(
 
     for key in col_keys:
         col = COLUMN_REGISTRY.get(key)
-        if col is None:
+        if col is None or (platform and platform not in col.platforms):
             continue
-        if platform and platform not in col.platforms:
-            continue
-
-        sel = col.select_sql if isinstance(col.select_sql, str) else col.select_sql.get(platform or "", "")
+        sel, j = _resolve_col_sql(col, platform)
         if sel:
             selects.append(sel)
-
-        j = col.join_sql
-        if isinstance(j, dict):
-            j = j.get(platform or "", "")
         if j and j not in seen_joins:
             extra_joins.append(j)
             seen_joins.add(j)
