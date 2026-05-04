@@ -330,6 +330,7 @@ class HiddenBody(BaseModel):
 class MergeBody(BaseModel):
     game_id_a: int
     game_id_b: int
+    preferred_title: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -1015,18 +1016,15 @@ async def merge_games(request: Request, body: MergeBody):
         survive = a if na > nb or (na == nb and a < b) else b
         discard = b if survive == a else a
 
-        # Enrich surviving row with any richer fields from discard
+        # Enrich surviving row: use chosen title if provided, else keep surviving's
+        chosen_title = body.preferred_title.strip() if body.preferred_title else None
         conn.execute("""
             UPDATE games SET
-                title     = CASE
-                    WHEN LENGTH(COALESCE((SELECT title FROM games WHERE id = ?), ''))
-                       > LENGTH(COALESCE(title, ''))
-                    THEN (SELECT title FROM games WHERE id = ?)
-                    ELSE title END,
+                title     = COALESCE(?, title),
                 cover_url = COALESCE(cover_url, (SELECT cover_url FROM games WHERE id = ?)),
                 igdb_id   = COALESCE(igdb_id,   (SELECT igdb_id   FROM games WHERE id = ?))
             WHERE id = ?
-        """, [discard, discard, discard, discard, survive])
+        """, [chosen_title, discard, discard, survive])
 
         # Re-point all platform ownership to surviving row
         conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
