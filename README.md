@@ -1,6 +1,6 @@
 # SteamPunk
 
-A personal gaming library aggregator and AI recommendation engine. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, and Nintendo Switch into a single normalized database, then uses Claude AI to surface personalized recommendations based on your actual play history.
+A personal gaming library aggregator and AI recommendation engine. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, and Nintendo Switch into a single normalized database, then (in future versions) uses Claude AI to surface personalized recommendations based on your actual play history.
 
 ## Features
 
