@@ -8,9 +8,10 @@ import sys
 import threading
 import urllib.parse
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 
 import duckdb
 import httpx
@@ -107,6 +108,214 @@ def _run_sync(platforms: list[str] | None = None):
 
 
 # ---------------------------------------------------------------------------
+# Column registry for list-view API
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ColumnDef:
+    label: str
+    group: str                          # "Library data" | "Platform data"
+    platforms: frozenset                # platform slugs that expose this column
+    select_sql: Union[str, dict]        # str, or {platform_slug: sql_fragment}
+    join_sql: Union[str, dict, None] = None  # str, or {platform_slug: join_clause}
+    default: bool = False
+
+
+# Canonical aliases used across column defs — deduplication relies on exact string match
+_J_STEAM_LIB  = "LEFT JOIN stg_steam_library ssl ON ssl.app_id = TRY_CAST(pg.external_id AS INTEGER)"
+_J_STEAM_DET  = "LEFT JOIN stg_steam_app_details sad ON sad.app_id = TRY_CAST(pg.external_id AS INTEGER)"
+_J_GOG        = "LEFT JOIN stg_gog_library sgog ON sgog.product_id = pg.external_id"
+_J_PSN        = "LEFT JOIN stg_psn_library spsn ON spsn.np_communication_id = pg.external_id"
+_J_ACH        = "LEFT JOIN achievements ach ON ach.platform_game_id = pg.id"
+_J_REV        = "LEFT JOIN reviews rv ON rv.platform_game_id = pg.id"
+_J_GENRES     = "LEFT JOIN game_genres gg ON gg.game_id = g.id LEFT JOIN genres gn ON gn.id = gg.genre_id"
+_J_TAGS       = "LEFT JOIN game_tags gt ON gt.game_id = g.id LEFT JOIN tags tg ON tg.id = gt.tag_id"
+
+COLUMN_REGISTRY: dict[str, ColumnDef] = {
+    # ── Library data (canonical) ───────────────────────────────────────────────
+    "playtime_mins": ColumnDef(
+        label="Playtime (total)", group="Library data",
+        platforms=frozenset({"steam", "switch"}),
+        select_sql="MAX(l.playtime_mins) AS playtime_mins",
+        default=True,
+    ),
+    "last_played_at": ColumnDef(
+        label="Last played", group="Library data",
+        platforms=frozenset({"steam"}),
+        select_sql="MAX(l.last_played_at) AS last_played_at",
+        default=True,
+    ),
+    "first_played_at": ColumnDef(
+        label="First played", group="Library data",
+        platforms=frozenset({"steam"}),
+        select_sql="MAX(l.first_played_at) AS first_played_at",
+    ),
+    "never_launched": ColumnDef(
+        label="Never launched", group="Library data",
+        platforms=frozenset({"steam"}),
+        select_sql="bool_and(l.never_launched) AS never_launched",
+    ),
+    "purchased_at": ColumnDef(
+        label="Purchased at", group="Library data",
+        platforms=frozenset({"steam", "gog", "psn", "switch"}),
+        select_sql="MAX(l.purchased_at) AS purchased_at",
+    ),
+    "purchase_source": ColumnDef(
+        label="Purchase source", group="Library data",
+        platforms=frozenset({"steam", "gog", "psn", "switch"}),
+        select_sql="MAX(l.purchase_source) AS purchase_source",
+    ),
+    # ── Platform data: Steam ───────────────────────────────────────────────────
+    "playtime_2weeks": ColumnDef(
+        label="Playtime (last 2 weeks)", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="any_value(ssl.playtime_2weeks_mins) AS playtime_2weeks",
+        join_sql=_J_STEAM_LIB,
+    ),
+    "release_date": ColumnDef(
+        label="Release date", group="Platform data",
+        platforms=frozenset({"steam", "gog"}),
+        select_sql={
+            "steam": "any_value(sad.release_date) AS release_date",
+            "gog":   "CAST(any_value(sgog.release_date) AS VARCHAR) AS release_date",
+        },
+        join_sql={"steam": _J_STEAM_DET, "gog": _J_GOG},
+    ),
+    "genres": ColumnDef(
+        label="Genres", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="list_distinct(list(gn.name)) FILTER (WHERE gn.name IS NOT NULL) AS genres",
+        join_sql=_J_GENRES,
+        default=True,
+    ),
+    "tags": ColumnDef(
+        label="Tags", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="list_distinct(list(tg.name)) FILTER (WHERE tg.name IS NOT NULL) AS tags",
+        join_sql=_J_TAGS,
+    ),
+    "steam_categories": ColumnDef(
+        label="Steam categories", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="any_value(sad.categories) AS steam_categories",
+        join_sql=_J_STEAM_DET,
+    ),
+    "achievement_pct": ColumnDef(
+        label="Achievement %", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="MAX(ach.completion_pct) AS achievement_pct",
+        join_sql=_J_ACH,
+        default=True,
+    ),
+    "achievements_count": ColumnDef(
+        label="Achievements (earned/total)", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql=(
+            "CASE WHEN MAX(ach.total_count) > 0 "
+            "THEN CAST(MAX(ach.unlocked_count) AS VARCHAR) || '/' || CAST(MAX(ach.total_count) AS VARCHAR) "
+            "ELSE NULL END AS achievements_count"
+        ),
+        join_sql=_J_ACH,
+    ),
+    "my_review": ColumnDef(
+        label="My review", group="Platform data",
+        platforms=frozenset({"steam"}),
+        select_sql="any_value(rv.review_text) AS my_review",
+        join_sql=_J_REV,
+    ),
+    # ── Platform data: PSN ────────────────────────────────────────────────────
+    "psn_platform": ColumnDef(
+        label="PS Platform (PS4/PS5)", group="Platform data",
+        platforms=frozenset({"psn"}),
+        select_sql="any_value(spsn.platform) AS psn_platform",
+        join_sql=_J_PSN,
+    ),
+    "acquisition_type": ColumnDef(
+        label="Acquisition type", group="Platform data",
+        platforms=frozenset({"psn"}),
+        select_sql="any_value(spsn.acquisition_type) AS acquisition_type",
+        join_sql=_J_PSN,
+    ),
+    "trophy_pct": ColumnDef(
+        label="Trophy progress %", group="Platform data",
+        platforms=frozenset({"psn"}),
+        select_sql="MAX(spsn.trophy_progress) AS trophy_pct",
+        join_sql=_J_PSN,
+    ),
+    "trophies_count": ColumnDef(
+        label="Trophies (earned/defined)", group="Platform data",
+        platforms=frozenset({"psn"}),
+        select_sql=(
+            "CASE WHEN MAX(spsn.trophies_defined) > 0 "
+            "THEN CAST(MAX(spsn.trophies_earned) AS VARCHAR) || '/' || CAST(MAX(spsn.trophies_defined) AS VARCHAR) "
+            "ELSE NULL END AS trophies_count"
+        ),
+        join_sql=_J_PSN,
+    ),
+}
+
+
+def _build_list_query(
+    platform: Optional[str],
+    col_keys: list[str],
+    q: Optional[str],
+    show_hidden: bool,
+) -> tuple[str, list]:
+    selects = [
+        "g.id AS game_id",
+        "g.title",
+        "list_distinct(list(pl.slug)) AS platforms",
+        "any_value(ugp.rating) AS rating",
+        "COALESCE(any_value(ugp.hidden), FALSE) AS hidden",
+    ]
+    extra_joins: list[str] = []
+    seen_joins: set[str] = set()
+
+    for key in col_keys:
+        col = COLUMN_REGISTRY.get(key)
+        if col is None:
+            continue
+        if platform and platform not in col.platforms:
+            continue
+
+        sel = col.select_sql if isinstance(col.select_sql, str) else col.select_sql.get(platform or "", "")
+        if sel:
+            selects.append(sel)
+
+        j = col.join_sql
+        if isinstance(j, dict):
+            j = j.get(platform or "", "")
+        if j and j not in seen_joins:
+            extra_joins.append(j)
+            seen_joins.add(j)
+
+    params: list = [show_hidden]
+    where_parts = ["(? OR NOT COALESCE(ugp.hidden, FALSE))"]
+
+    if platform:
+        where_parts.append("pl.slug = ?")
+        params.append(platform)
+
+    if q:
+        where_parts.append("lower(g.title) LIKE ?")
+        params.append(f"%{q.lower()}%")
+
+    sql = (
+        f"SELECT {', '.join(selects)}\n"
+        "FROM games g\n"
+        "JOIN platform_games pg ON pg.game_id = g.id\n"
+        "JOIN platforms pl ON pl.id = pg.platform_id\n"
+        "JOIN library l ON l.platform_game_id = pg.id\n"
+        "LEFT JOIN user_game_prefs ugp ON ugp.game_id = g.id\n"
+        + ("\n".join(extra_joins) + "\n" if extra_joins else "")
+        + f"WHERE {' AND '.join(where_parts)}\n"
+        "GROUP BY g.id, g.title\n"
+        "ORDER BY lower(g.title)"
+    )
+    return sql, params
+
+
+# ---------------------------------------------------------------------------
 # Pydantic models for preference endpoints
 # ---------------------------------------------------------------------------
 
@@ -116,6 +325,11 @@ class RatingBody(BaseModel):
 
 class HiddenBody(BaseModel):
     hidden: bool
+
+
+class MergeBody(BaseModel):
+    game_id_a: int
+    game_id_b: int
 
 
 # ---------------------------------------------------------------------------
@@ -730,6 +944,125 @@ async def set_hidden(request: Request, game_id: int, body: HiddenBody):
         """, [game_id, body.hidden])
 
     return JSONResponse({"game_id": game_id, "hidden": body.hidden})
+
+
+# ---------------------------------------------------------------------------
+# List-view API endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/library/columns")
+async def api_library_columns(request: Request, platform: str = ""):
+    if not _user(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    if not platform:
+        return JSONResponse({"platform": "", "groups": []})
+
+    groups: dict[str, list] = {}
+    for key, col in COLUMN_REGISTRY.items():
+        if platform not in col.platforms:
+            continue
+        groups.setdefault(col.group, []).append({
+            "key": key,
+            "label": col.label,
+            "default": col.default,
+        })
+
+    return JSONResponse({
+        "platform": platform,
+        "groups": [{"label": label, "columns": cols} for label, cols in groups.items()],
+    })
+
+
+@app.get("/api/library/games")
+async def api_library_games(
+    request: Request,
+    platform: str = "",
+    columns: str = "",
+    q: str = "",
+    show_hidden: bool = False,
+):
+    if not _user(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    col_keys = [c.strip() for c in columns.split(",") if c.strip()] if columns else []
+    sql, params = _build_list_query(platform or None, col_keys, q or None, show_hidden)
+
+    with get_db() as conn:
+        rows = _query(conn, sql, params)
+
+    return JSONResponse({"games": rows})
+
+
+@app.post("/library/games/merge")
+async def merge_games(request: Request, body: MergeBody):
+    if not _user(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    a, b = body.game_id_a, body.game_id_b
+    if a == b:
+        return JSONResponse({"error": "cannot merge a game with itself"}, status_code=400)
+
+    with get_db() as conn:
+        # Determine surviving ID: most platform_games wins; lower id breaks ties
+        counts = _query(
+            conn,
+            "SELECT game_id, COUNT(*) AS n FROM platform_games WHERE game_id IN (?, ?) GROUP BY game_id",
+            [a, b],
+        )
+        count_map = {r["game_id"]: r["n"] for r in counts}
+        na, nb = count_map.get(a, 0), count_map.get(b, 0)
+        survive = a if na > nb or (na == nb and a < b) else b
+        discard = b if survive == a else a
+
+        # Enrich surviving row with any richer fields from discard
+        conn.execute("""
+            UPDATE games SET
+                title     = CASE
+                    WHEN LENGTH(COALESCE((SELECT title FROM games WHERE id = ?), ''))
+                       > LENGTH(COALESCE(title, ''))
+                    THEN (SELECT title FROM games WHERE id = ?)
+                    ELSE title END,
+                cover_url = COALESCE(cover_url, (SELECT cover_url FROM games WHERE id = ?)),
+                igdb_id   = COALESCE(igdb_id,   (SELECT igdb_id   FROM games WHERE id = ?))
+            WHERE id = ?
+        """, [discard, discard, discard, discard, survive])
+
+        # Re-point all platform ownership to surviving row
+        conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
+
+        # Union junction tables (INSERT OR IGNORE skips duplicates)
+        conn.execute(
+            "INSERT OR IGNORE INTO game_tags (game_id, tag_id) SELECT ?, tag_id FROM game_tags WHERE game_id = ?",
+            [survive, discard],
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO game_genres (game_id, genre_id) SELECT ?, genre_id FROM game_genres WHERE game_id = ?",
+            [survive, discard],
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO store_availability (game_id, platform_id, available, external_id, checked_at) "
+            "SELECT ?, platform_id, available, external_id, checked_at FROM store_availability WHERE game_id = ?",
+            [survive, discard],
+        )
+        # Carry prefs from discard only if surviving row has none
+        conn.execute(
+            "INSERT OR IGNORE INTO user_game_prefs (game_id, rating, hidden, updated_at) "
+            "SELECT ?, rating, hidden, updated_at FROM user_game_prefs WHERE game_id = ?",
+            [survive, discard],
+        )
+
+        # Delete discard's child rows then the game row itself
+        for table, col in [
+            ("game_tags", "game_id"),
+            ("game_genres", "game_id"),
+            ("store_availability", "game_id"),
+            ("user_game_prefs", "game_id"),
+        ]:
+            conn.execute(f"DELETE FROM {table} WHERE {col} = ?", [discard])
+        conn.execute("DELETE FROM games WHERE id = ?", [discard])
+
+    return JSONResponse({"surviving_game_id": survive})
 
 
 # ---------------------------------------------------------------------------

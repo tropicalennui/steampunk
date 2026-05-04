@@ -41,55 +41,71 @@
 
     <!-- Show hidden toggle -->
     {% if show_hidden %}
-    <a
-      href="/library"
-      class="text-xs px-3 py-1.5 rounded bg-zinc-700 border border-zinc-500 text-zinc-200 hover:border-amber-600 transition"
-    >
-      Hide hidden
-    </a>
+    <a href="/library" class="text-xs px-3 py-1.5 rounded bg-zinc-700 border border-zinc-500 text-zinc-200 hover:border-amber-600 transition">Hide hidden</a>
     {% else %}
-    <a
-      href="/library?show_hidden=true"
-      class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300 transition"
-    >
-      Show hidden
-    </a>
+    <a href="/library?show_hidden=true" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-300 transition">Show hidden</a>
     {% endif %}
+
+    <!-- Column picker (list view + single-platform only) -->
+    <div id="columns-btn-wrap" class="relative hidden">
+      <button
+        id="columns-btn"
+        onclick="toggleColumnPicker()"
+        class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition"
+      >Columns &#9660;</button>
+      <div id="columns-picker" class="hidden absolute top-full right-0 mt-1 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 p-3 max-h-80 overflow-y-auto">
+        <p id="columns-loading" class="text-xs text-zinc-500 py-2 text-center">Loading&hellip;</p>
+      </div>
+    </div>
 
     <input
       id="search"
       type="text"
       placeholder="Search by name or genre&hellip;"
       class="bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 w-56"
-      oninput="applyFilters()"
+      oninput="onSearch()"
     />
+
+    <!-- Grid / List view toggle -->
+    <div class="flex items-center gap-0.5">
+      <button id="btn-grid-view" onclick="setViewMode('grid')" title="Grid view"
+        class="p-1.5 rounded-l bg-zinc-800 border border-zinc-700 border-r-0 text-zinc-400 hover:text-amber-400 hover:border-amber-600 transition view-toggle-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+        </svg>
+      </button>
+      <button id="btn-list-view" onclick="setViewMode('list')" title="List view"
+        class="p-1.5 rounded-r bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-amber-400 hover:border-amber-600 transition view-toggle-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
 <!-- Platform filter pills -->
 {% if games %}
 <div class="flex flex-wrap gap-2 mb-6" id="platform-filters">
-  <button onclick="setPlatformFilter('all',    this)" class="filter-pill active-pill" data-filter="all">All</button>
-  <button onclick="setPlatformFilter('steam',  this)" class="filter-pill" data-filter="steam">Steam</button>
-  <button onclick="setPlatformFilter('gog',    this)" class="filter-pill" data-filter="gog">GOG</button>
-  <button onclick="setPlatformFilter('psn',    this)" class="filter-pill" data-filter="psn">PlayStation</button>
-  <button onclick="setPlatformFilter('multi',  this)" class="filter-pill" data-filter="multi">Multi-platform</button>
+  <button onclick="setPlatformFilter('all',   this)" class="filter-pill active-pill" data-filter="all">All</button>
+  <button onclick="setPlatformFilter('steam', this)" class="filter-pill" data-filter="steam">Steam</button>
+  <button onclick="setPlatformFilter('gog',   this)" class="filter-pill" data-filter="gog">GOG</button>
+  <button onclick="setPlatformFilter('psn',   this)" class="filter-pill" data-filter="psn">PlayStation</button>
+  <button onclick="setPlatformFilter('multi', this)" class="filter-pill" data-filter="multi">Multi-platform</button>
 </div>
 {% endif %}
 
 <style>
   .filter-pill {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    border: 1px solid rgb(63 63 70);
-    color: rgb(161 161 170);
-    background: transparent;
-    cursor: pointer;
-    transition: all 0.15s;
+    font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 9999px;
+    border: 1px solid rgb(63 63 70); color: rgb(161 161 170);
+    background: transparent; cursor: pointer; transition: all 0.15s;
   }
   .filter-pill:hover { border-color: rgb(217 119 6); color: rgb(251 191 36); }
   .active-pill { border-color: rgb(217 119 6) !important; color: rgb(251 191 36) !important; background: rgb(28 25 23); }
+  .view-toggle-btn.active-view { border-color: rgb(217 119 6); color: rgb(251 191 36); }
+  .drag-over { outline: 2px solid rgb(217 119 6) !important; outline-offset: 2px; }
+  .dragging  { opacity: 0.5; transform: scale(1.03); }
 </style>
 
 {% if not games %}
@@ -99,7 +115,7 @@
 </div>
 {% else %}
 
-<!-- Game grid -->
+<!-- ── Grid view ─────────────────────────────────────────────────────────── -->
 <div id="game-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
   {% for game in games %}
   <div
@@ -108,8 +124,8 @@
     data-genres="{{ game.genres | join(' ') | lower }}"
     data-platforms="{{ game.platforms | join(' ') | lower }}"
     data-game-id="{{ game.game_id }}"
+    data-game-title="{{ game.title }}"
   >
-    <!-- Cover image -->
     {% if game.cover_url %}
     <img src="{{ game.cover_url }}" alt="" class="w-full object-cover aspect-video" loading="lazy" />
     {% else %}
@@ -118,36 +134,24 @@
     </div>
     {% endif %}
 
-    <!-- Action buttons (rating + hide) — visible on hover -->
+    <!-- Action buttons (rating + hide) -->
     <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-      <!-- Thumbs up -->
-      <button
-        onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'up', this)"
+      <button onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'up', this)"
         class="w-6 h-6 rounded flex items-center justify-center text-xs transition
                {% if game.rating == 'up' %}bg-green-600 text-white{% else %}bg-zinc-800/80 text-zinc-400 hover:text-green-400{% endif %}"
-        title="Thumbs up"
-      >&#128077;</button>
-      <!-- Thumbs down -->
-      <button
-        onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'down', this)"
+        title="Thumbs up">&#128077;</button>
+      <button onclick="setRating({{ game.game_id }}, '{{ game.rating }}', 'down', this)"
         class="w-6 h-6 rounded flex items-center justify-center text-xs transition
                {% if game.rating == 'down' %}bg-red-700 text-white{% else %}bg-zinc-800/80 text-zinc-400 hover:text-red-400{% endif %}"
-        title="Thumbs down"
-      >&#128078;</button>
-      <!-- Hide -->
-      <button
-        onclick="setHidden({{ game.game_id }}, {{ 'true' if not game.hidden else 'false' }}, this.closest('.game-card'))"
+        title="Thumbs down">&#128078;</button>
+      <button onclick="setHidden({{ game.game_id }}, {{ 'true' if not game.hidden else 'false' }}, this.closest('.game-card'))"
         class="w-6 h-6 rounded flex items-center justify-center text-xs bg-zinc-800/80 text-zinc-400 hover:text-zinc-200 transition"
-        title="{{ 'Unhide' if game.hidden else 'Hide' }}"
-      >{% if game.hidden %}&#128065;{% else %}&#128065;&#65038;{% endif %}</button>
+        title="{{ 'Unhide' if game.hidden else 'Hide' }}">{% if game.hidden %}&#128065;{% else %}&#128065;&#65038;{% endif %}</button>
     </div>
 
     <div class="p-3">
-      <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white" title="{{ game.title }}">
-        {{ game.title }}
-      </p>
+      <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white" title="{{ game.title }}">{{ game.title }}</p>
 
-      <!-- Platform badges -->
       {% if game.platforms %}
       <div class="flex flex-wrap gap-1 mt-1.5">
         {% for platform in game.platforms %}
@@ -159,23 +163,16 @@
         </span>
         {% endfor %}
         {% if game.platforms | length > 1 %}
-        <span class="text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-900/40 text-amber-400 border border-amber-800/60">
-          &#x2715;{{ game.platforms | length }}
-        </span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-900/40 text-amber-400 border border-amber-800/60">&#x2715;{{ game.platforms | length }}</span>
         {% endif %}
       </div>
       {% endif %}
 
-      <!-- Playtime / never played — shown for Steam; suppressed for GOG/PSN-only -->
       <div class="flex items-center justify-between mt-1.5">
         {% set has_playtime = 'steam' in (game.platforms or []) %}
         {% if has_playtime %}
         <span class="text-xs text-zinc-500">
-          {% if game.playtime_mins and game.playtime_mins > 0 %}
-            {{ (game.playtime_mins / 60) | round(1) }}h
-          {% else %}
-            Never played
-          {% endif %}
+          {% if game.playtime_mins and game.playtime_mins > 0 %}{{ (game.playtime_mins / 60) | round(1) }}h{% else %}Never played{% endif %}
         </span>
         {% else %}
         <span class="text-xs text-zinc-600">Playtime unknown</span>
@@ -185,33 +182,20 @@
         {% endif %}
       </div>
 
-      <!-- Genres -->
       {% if game.genres %}
       <div class="flex flex-wrap gap-1 mt-2">
         {% for genre in game.genres[:3] %}
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-          {{ genre }}
-        </span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">{{ genre }}</span>
         {% endfor %}
       </div>
       {% endif %}
 
-      <!-- Store availability badges -->
       {% if game.available_on_steam or game.available_on_gog %}
       <div class="flex flex-wrap gap-1 mt-2">
-        {% if game.available_on_steam %}
-        <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-900">
-          On Steam
-        </span>
-        {% endif %}
-        {% if game.available_on_gog %}
-        <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-900">
-          On GOG
-        </span>
-        {% endif %}
+        {% if game.available_on_steam %}<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-900">On Steam</span>{% endif %}
+        {% if game.available_on_gog %}<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-900">On GOG</span>{% endif %}
       </div>
       {% endif %}
-
     </div>
   </div>
   {% endfor %}
@@ -219,19 +203,315 @@
 
 <p id="no-results" class="hidden text-center py-16 text-zinc-500 text-sm">No games match your search.</p>
 
+<!-- ── List view ─────────────────────────────────────────────────────────── -->
+<div id="game-list" class="hidden">
+  <div class="overflow-x-auto rounded-lg border border-zinc-800">
+    <table class="w-full text-sm border-collapse">
+      <thead id="list-thead"></thead>
+      <tbody id="list-tbody"></tbody>
+    </table>
+  </div>
+  <p id="list-loading" class="text-center py-8 text-zinc-500 text-sm">Loading&hellip;</p>
+  <p id="list-no-results" class="hidden text-center py-8 text-zinc-500 text-sm">No games match your search.</p>
+</div>
+
 {% endif %}
 
-<script>
-  let activePlatformFilter = 'all';
+<!-- ── Merge confirmation modal ──────────────────────────────────────────── -->
+<div id="merge-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+  <div class="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+    <h3 class="text-base font-semibold text-amber-400 mb-4">Merge games?</h3>
+    <div class="flex items-start gap-3 mb-4">
+      <div id="merge-game-a" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200"></div>
+      <div class="pt-3 text-zinc-500 font-bold">+</div>
+      <div id="merge-game-b" class="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-sm text-zinc-200"></div>
+    </div>
+    <p class="text-xs text-zinc-500 mb-5">These two entries will be collapsed into one game. All platform data will be combined. This cannot be undone without a full re-sync.</p>
+    <div class="flex justify-end gap-3">
+      <button onclick="closeMergeModal()" class="px-4 py-2 text-sm rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:border-zinc-500 transition">Cancel</button>
+      <button id="merge-confirm-btn" onclick="confirmMerge()" class="px-4 py-2 text-sm rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition">Merge</button>
+    </div>
+  </div>
+</div>
 
+<script>
+  // ── State ────────────────────────────────────────────────────────────────────
+  let activePlatformFilter = 'all';
+  let viewMode = localStorage.getItem('libraryViewMode') || 'grid';
+  let listSearchTimer = null;
+  let pendingMerge = null;   // { gameIdA, gameIdB }
+  const SHOW_HIDDEN = {{ 'true' if show_hidden else 'false' }};
+
+  // ── Initialise on load ───────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    applyViewToggleUI();
+    if (viewMode === 'list') fetchListGames();
+  });
+
+  // ── View mode toggle ─────────────────────────────────────────────────────────
+  function setViewMode(mode) {
+    viewMode = mode;
+    localStorage.setItem('libraryViewMode', mode);
+    applyViewToggleUI();
+    if (mode === 'list') {
+      fetchListGames();
+    } else {
+      applyGridFilters();
+      updateDragState();
+    }
+  }
+
+  function applyViewToggleUI() {
+    const gridEl  = document.getElementById('game-grid');
+    const listEl  = document.getElementById('game-list');
+    const btnGrid = document.getElementById('btn-grid-view');
+    const btnList = document.getElementById('btn-list-view');
+    if (!gridEl) return;
+
+    const isGrid = viewMode === 'grid';
+    gridEl.classList.toggle('hidden', !isGrid);
+    listEl.classList.toggle('hidden', isGrid);
+    btnGrid.classList.toggle('active-view', isGrid);
+    btnList.classList.toggle('active-view', !isGrid);
+
+    updateColumnsBtnVisibility();
+  }
+
+  // ── Platform filter ──────────────────────────────────────────────────────────
   function setPlatformFilter(filter, btn) {
     activePlatformFilter = filter;
     document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active-pill'));
     btn.classList.add('active-pill');
-    applyFilters();
+
+    if (viewMode === 'list') {
+      updateColumnsBtnVisibility();
+      loadColumns(filter);
+      fetchListGames();
+    } else {
+      applyGridFilters();
+      updateDragState();
+    }
   }
 
-  function applyFilters() {
+  // ── Columns button visibility ────────────────────────────────────────────────
+  const SINGLE_PLATFORMS = new Set(['steam', 'gog', 'psn', 'switch']);
+
+  function updateColumnsBtnVisibility() {
+    const wrap = document.getElementById('columns-btn-wrap');
+    if (!wrap) return;
+    const show = viewMode === 'list' && SINGLE_PLATFORMS.has(activePlatformFilter);
+    wrap.classList.toggle('hidden', !show);
+    if (!show) document.getElementById('columns-picker').classList.add('hidden');
+  }
+
+  // ── Column picker ────────────────────────────────────────────────────────────
+  let columnDefs = {};   // { platform: { groups: [...] } }
+
+  async function loadColumns(platform) {
+    if (!SINGLE_PLATFORMS.has(platform)) return;
+    if (columnDefs[platform]) { renderColumnPicker(platform); return; }
+
+    const res = await fetch(`/api/library/columns?platform=${platform}`);
+    const data = await res.json();
+    columnDefs[platform] = data;
+    renderColumnPicker(platform);
+  }
+
+  function renderColumnPicker(platform) {
+    const picker = document.getElementById('columns-picker');
+    const loading = document.getElementById('columns-loading');
+    if (loading) loading.remove();
+
+    const data = columnDefs[platform];
+    if (!data || !data.groups.length) {
+      picker.innerHTML = '<p class="text-xs text-zinc-500 py-2 text-center">No extra columns available.</p>';
+      return;
+    }
+
+    const active = getActiveColumns(platform);
+    let html = '';
+    for (const group of data.groups) {
+      html += `<p class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1 mt-2 first:mt-0">${group.label}</p>`;
+      for (const col of group.columns) {
+        const checked = active.has(col.key) ? 'checked' : '';
+        html += `<label class="flex items-center gap-2 py-1 cursor-pointer hover:text-zinc-200 text-zinc-400 text-xs">
+          <input type="checkbox" class="accent-amber-500" data-col-key="${col.key}" ${checked}
+            onchange="onColumnToggle('${platform}', '${col.key}', this.checked)">
+          ${col.label}
+        </label>`;
+      }
+    }
+    picker.innerHTML = html;
+  }
+
+  function getActiveColumns(platform) {
+    const stored = localStorage.getItem(`colPrefs_${platform}`);
+    if (stored) return new Set(JSON.parse(stored));
+    // Default: columns where default=true
+    const defs = columnDefs[platform];
+    if (!defs) return new Set();
+    const defaults = new Set();
+    for (const group of defs.groups)
+      for (const col of group.columns)
+        if (col.default) defaults.add(col.key);
+    return defaults;
+  }
+
+  function onColumnToggle(platform, key, checked) {
+    const active = getActiveColumns(platform);
+    if (checked) active.add(key); else active.delete(key);
+    localStorage.setItem(`colPrefs_${platform}`, JSON.stringify([...active]));
+    fetchListGames();
+  }
+
+  function toggleColumnPicker() {
+    const picker = document.getElementById('columns-picker');
+    picker.classList.toggle('hidden');
+  }
+
+  // ── List view fetch & render ─────────────────────────────────────────────────
+  async function fetchListGames() {
+    const loading = document.getElementById('list-loading');
+    const noResults = document.getElementById('list-no-results');
+    const thead = document.getElementById('list-thead');
+    const tbody = document.getElementById('list-tbody');
+    loading.classList.remove('hidden');
+    noResults.classList.add('hidden');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    const q = document.getElementById('search').value.trim();
+    const platform = SINGLE_PLATFORMS.has(activePlatformFilter) ? activePlatformFilter : '';
+    const cols = platform ? [...getActiveColumns(platform)].join(',') : '';
+
+    const params = new URLSearchParams();
+    if (platform) params.set('platform', platform);
+    if (cols)     params.set('columns', cols);
+    if (q)        params.set('q', q);
+    if (SHOW_HIDDEN) params.set('show_hidden', 'true');
+
+    const res  = await fetch(`/api/library/games?${params}`);
+    const data = await res.json();
+    loading.classList.add('hidden');
+
+    const games = data.games || [];
+    if (!games.length) { noResults.classList.remove('hidden'); return; }
+
+    // Derive column order from first row (base cols first, then extras)
+    const baseCols = ['title', 'platforms', 'rating'];
+    const extraCols = games.length
+      ? Object.keys(games[0]).filter(k => !['game_id','title','platforms','rating','hidden'].includes(k))
+      : [];
+    const allCols = [...baseCols, ...extraCols];
+
+    // Render header
+    let thRow = '<tr>';
+    for (const col of allCols) thRow += `<th class="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-zinc-500 bg-zinc-900 border-b border-zinc-800 whitespace-nowrap cursor-pointer hover:text-zinc-300 select-none" onclick="sortList('${col}')">${colLabel(col)}</th>`;
+    thRow += '<th class="px-3 py-2 bg-zinc-900 border-b border-zinc-800 w-16"></th></tr>';
+    thead.innerHTML = thRow;
+
+    renderListRows(games, allCols);
+  }
+
+  function renderListRows(games, cols) {
+    const tbody = document.getElementById('list-tbody');
+    tbody.innerHTML = '';
+    for (const game of games) {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-zinc-800/60 hover:bg-zinc-800/30 transition group' + (game.hidden ? ' opacity-40' : '');
+      tr.dataset.gameId = game.game_id;
+
+      let cells = '';
+      for (const col of cols) {
+        const val = game[col];
+        cells += `<td class="px-3 py-2 text-zinc-300 text-xs whitespace-nowrap max-w-xs truncate">${formatCell(col, val, game)}</td>`;
+      }
+      // Actions
+      const ratingUp   = game.rating === 'up'   ? 'bg-green-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-green-400';
+      const ratingDown = game.rating === 'down'  ? 'bg-red-700 text-white'   : 'bg-zinc-800 text-zinc-400 hover:text-red-400';
+      cells += `<td class="px-2 py-2">
+        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onclick="setRating(${game.game_id},'${game.rating ?? ''}','up',this)" class="w-6 h-6 rounded flex items-center justify-center text-xs ${ratingUp}" title="Thumbs up">&#128077;</button>
+          <button onclick="setRating(${game.game_id},'${game.rating ?? ''}','down',this)" class="w-6 h-6 rounded flex items-center justify-center text-xs ${ratingDown}" title="Thumbs down">&#128078;</button>
+          <button onclick="setHiddenList(${game.game_id},${!game.hidden},this.closest('tr'))" class="w-6 h-6 rounded flex items-center justify-center text-xs bg-zinc-800 text-zinc-400 hover:text-zinc-200" title="${game.hidden ? 'Unhide' : 'Hide'}">&#128065;&#65038;</button>
+        </div>
+      </td>`;
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    }
+  }
+
+  // ── List sort ────────────────────────────────────────────────────────────────
+  let sortKey = null, sortAsc = true;
+
+  function sortList(col) {
+    if (sortKey === col) sortAsc = !sortAsc; else { sortKey = col; sortAsc = true; }
+    const rows = [...document.getElementById('list-tbody').querySelectorAll('tr')];
+    const colIdx = [...document.getElementById('list-thead').querySelectorAll('th')]
+      .findIndex(th => th.getAttribute('onclick') === `sortList('${col}')`);
+    rows.sort((a, b) => {
+      const av = a.cells[colIdx]?.textContent.trim() || '';
+      const bv = b.cells[colIdx]?.textContent.trim() || '';
+      return sortAsc ? av.localeCompare(bv, undefined, {numeric: true}) : bv.localeCompare(av, undefined, {numeric: true});
+    });
+    const tbody = document.getElementById('list-tbody');
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  // ── Cell formatting helpers ──────────────────────────────────────────────────
+  const COL_LABELS = {
+    title: 'Title', platforms: 'Platforms', rating: 'Rating',
+    playtime_mins: 'Playtime', last_played_at: 'Last played', first_played_at: 'First played',
+    never_launched: 'Never launched', purchased_at: 'Purchased', purchase_source: 'Source',
+    playtime_2weeks: 'Last 2 wks', release_date: 'Released', genres: 'Genres', tags: 'Tags',
+    steam_categories: 'Categories', achievement_pct: 'Achiev. %', achievements_count: 'Achievements',
+    my_review: 'My review', psn_platform: 'PS Platform', acquisition_type: 'Acquisition',
+    trophy_pct: 'Trophy %', trophies_count: 'Trophies',
+  };
+  function colLabel(key) { return COL_LABELS[key] || key; }
+
+  const PLATFORM_CLASSES = {
+    steam: 'bg-blue-900/60 text-blue-300 border border-blue-800',
+    gog:   'bg-purple-900/60 text-purple-300 border border-purple-800',
+    psn:   'bg-zinc-800 text-zinc-400 border border-zinc-700',
+  };
+
+  function formatCell(col, val, game) {
+    if (val === null || val === undefined) return '<span class="text-zinc-600">—</span>';
+    if (col === 'title') return `<span class="font-medium text-gray-200">${escHtml(val)}</span>`;
+    if (col === 'platforms') {
+      const list = Array.isArray(val) ? val : [val];
+      return list.map(p => `<span class="text-[9px] px-1.5 py-0.5 rounded font-medium ${PLATFORM_CLASSES[p] || 'bg-zinc-800 text-zinc-400 border border-zinc-700'}">${p.toUpperCase()}</span>`).join(' ');
+    }
+    if (col === 'rating') {
+      if (val === 'up')   return '<span class="text-green-400">&#128077;</span>';
+      if (val === 'down') return '<span class="text-red-400">&#128078;</span>';
+      return '<span class="text-zinc-600">—</span>';
+    }
+    if (col === 'never_launched') return val ? '<span class="text-zinc-500">Never played</span>' : '';
+    if (col === 'playtime_mins' || col === 'playtime_2weeks') {
+      const mins = Number(val);
+      if (!mins) return '<span class="text-zinc-600">0 min</span>';
+      return mins >= 60 ? `${(mins/60).toFixed(1)}h` : `${mins}m`;
+    }
+    if (col === 'achievement_pct' || col === 'trophy_pct') return `${Number(val).toFixed(1)}%`;
+    if (col === 'last_played_at' || col === 'first_played_at' || col === 'purchased_at') return fmtDate(val);
+    if (Array.isArray(val)) return val.slice(0, 4).map(v => `<span class="text-[9px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">${escHtml(String(v))}</span>`).join(' ');
+    return escHtml(String(val));
+  }
+
+  function fmtDate(val) {
+    if (!val) return '—';
+    try { return new Date(val).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'}); }
+    catch { return val; }
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Grid filters (client-side) ────────────────────────────────────────────────
+  function applyGridFilters() {
     const q = document.getElementById('search').value.toLowerCase().trim();
     const cards = document.querySelectorAll('.game-card');
     let visible = 0;
@@ -239,17 +519,121 @@
       const textMatch = !q || card.dataset.title.includes(q) || card.dataset.genres.includes(q);
       const platforms = (card.dataset.platforms || '').split(' ').filter(Boolean);
       let platformMatch = true;
-      if (activePlatformFilter === 'steam')  platformMatch = platforms.includes('steam');
-      else if (activePlatformFilter === 'gog')    platformMatch = platforms.includes('gog');
-      else if (activePlatformFilter === 'psn')    platformMatch = platforms.includes('psn');
-      else if (activePlatformFilter === 'multi')  platformMatch = platforms.length > 1;
+      if (activePlatformFilter === 'steam') platformMatch = platforms.includes('steam');
+      else if (activePlatformFilter === 'gog')   platformMatch = platforms.includes('gog');
+      else if (activePlatformFilter === 'psn')   platformMatch = platforms.includes('psn');
+      else if (activePlatformFilter === 'multi') platformMatch = platforms.length > 1;
       const show = textMatch && platformMatch;
       card.style.display = show ? '' : 'none';
       if (show) visible++;
     });
     document.getElementById('no-results').classList.toggle('hidden', visible > 0);
+    return visible;
   }
 
+  // ── Search input handler ─────────────────────────────────────────────────────
+  function onSearch() {
+    if (viewMode === 'list') {
+      clearTimeout(listSearchTimer);
+      listSearchTimer = setTimeout(fetchListGames, 300);
+    } else {
+      const visible = applyGridFilters();
+      updateDragState(visible);
+    }
+  }
+
+  // ── Drag-to-merge ────────────────────────────────────────────────────────────
+  let dragSourceCard = null;
+
+  function updateDragState(visibleCount) {
+    const q = document.getElementById('search').value.trim();
+    const count = visibleCount !== undefined ? visibleCount : countVisibleCards();
+    const enable = viewMode === 'grid' && q.length > 0 && count >= 2;
+    document.querySelectorAll('.game-card').forEach(card => {
+      if (enable && card.style.display !== 'none') {
+        card.setAttribute('draggable', 'true');
+        card.addEventListener('dragstart', onDragStart);
+        card.addEventListener('dragend',   onDragEnd);
+        card.addEventListener('dragover',  onDragOver);
+        card.addEventListener('dragleave', onDragLeave);
+        card.addEventListener('drop',      onDrop);
+      } else {
+        card.removeAttribute('draggable');
+        card.removeEventListener('dragstart', onDragStart);
+        card.removeEventListener('dragend',   onDragEnd);
+        card.removeEventListener('dragover',  onDragOver);
+        card.removeEventListener('dragleave', onDragLeave);
+        card.removeEventListener('drop',      onDrop);
+      }
+    });
+  }
+
+  function countVisibleCards() {
+    return [...document.querySelectorAll('.game-card')].filter(c => c.style.display !== 'none').length;
+  }
+
+  function onDragStart(e) {
+    dragSourceCard = this;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function onDragEnd()      { this.classList.remove('dragging'); dragSourceCard = null; }
+  function onDragOver(e)    { e.preventDefault(); if (this !== dragSourceCard) this.classList.add('drag-over'); }
+  function onDragLeave()    { this.classList.remove('drag-over'); }
+  function onDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    if (!dragSourceCard || this === dragSourceCard) return;
+    const idA    = dragSourceCard.dataset.gameId;
+    const idB    = this.dataset.gameId;
+    const titleA = dragSourceCard.dataset.gameTitle;
+    const titleB = this.dataset.gameTitle;
+    showMergeModal(idA, idB, titleA, titleB);
+  }
+
+  // ── Merge modal ──────────────────────────────────────────────────────────────
+  function showMergeModal(idA, idB, titleA, titleB) {
+    pendingMerge = { gameIdA: Number(idA), gameIdB: Number(idB) };
+    document.getElementById('merge-game-a').textContent = titleA;
+    document.getElementById('merge-game-b').textContent = titleB;
+    document.getElementById('merge-modal').classList.remove('hidden');
+  }
+
+  function closeMergeModal() {
+    document.getElementById('merge-modal').classList.add('hidden');
+    pendingMerge = null;
+  }
+
+  async function confirmMerge() {
+    if (!pendingMerge) return;
+    const btn = document.getElementById('merge-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Merging…';
+
+    const res = await fetch('/library/games/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pendingMerge),
+    });
+
+    closeMergeModal();
+    btn.disabled = false;
+    btn.textContent = 'Merge';
+
+    if (!res.ok) return;
+    const { surviving_game_id } = await res.json();
+
+    // Remove both cards; refresh the surviving card via re-fetch
+    document.querySelectorAll('.game-card').forEach(c => {
+      if ([String(pendingMerge?.gameIdA), String(pendingMerge?.gameIdB)].includes(c.dataset.gameId)) {
+        c.remove();
+      }
+    });
+    // A full page reload is the safest way to get the refreshed merged card
+    location.reload();
+  }
+
+  // ── Sync helpers ─────────────────────────────────────────────────────────────
   function submitSync(platform) {
     document.getElementById('sync-platforms').value = platform;
     document.getElementById('sync-dropdown').classList.add('hidden');
@@ -257,62 +641,56 @@
   }
 
   document.addEventListener('click', function(e) {
-    const menu = document.getElementById('sync-menu');
-    if (menu && !menu.contains(e.target)) {
+    const menu   = document.getElementById('sync-menu');
+    const picker = document.getElementById('columns-picker');
+    const colBtn = document.getElementById('columns-btn');
+    if (menu && !menu.contains(e.target))
       document.getElementById('sync-dropdown')?.classList.add('hidden');
-    }
+    if (picker && colBtn && !picker.contains(e.target) && !colBtn.contains(e.target))
+      picker.classList.add('hidden');
   });
 
+  // ── Rating / hide ────────────────────────────────────────────────────────────
   async function setRating(gameId, currentRating, newRating, btn) {
-    // Toggle off if clicking the active rating
     const rating = currentRating === newRating ? null : newRating;
-    try {
-      const resp = await fetch(`/library/games/${gameId}/rating`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating }),
-      });
-      if (!resp.ok) return;
-      // Refresh the card's button states
-      const card = btn.closest('.game-card');
+    const resp = await fetch(`/library/games/${gameId}/rating`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ rating }),
+    });
+    if (!resp.ok) return;
+    const card = btn.closest('.game-card');
+    if (card) {
       const [upBtn, downBtn] = card.querySelectorAll('button[onclick*="setRating"]');
-      upBtn.className = upBtn.className.replace(/bg-(green|zinc)-\S+|text-(green|white|zinc)-\S+/g, '');
+      upBtn.className   = upBtn.className.replace(/bg-(green|zinc)-\S+|text-(green|white|zinc)-\S+/g, '');
       downBtn.className = downBtn.className.replace(/bg-(red|zinc)-\S+|text-(red|white|zinc)-\S+/g, '');
-      if (rating === 'up') {
-        upBtn.classList.add('bg-green-600', 'text-white');
-        downBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
-      } else if (rating === 'down') {
-        downBtn.classList.add('bg-red-700', 'text-white');
-        upBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
-      } else {
-        upBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
-        downBtn.classList.add('bg-zinc-800/80', 'text-zinc-400');
-      }
-      // Store new rating in onclick for next toggle
-      upBtn.setAttribute('onclick', `setRating(${gameId}, '${rating ?? ''}', 'up', this)`);
-      downBtn.setAttribute('onclick', `setRating(${gameId}, '${rating ?? ''}', 'down', this)`);
-    } catch (e) {}
+      if (rating === 'up')   { upBtn.classList.add('bg-green-600','text-white'); downBtn.classList.add('bg-zinc-800/80','text-zinc-400'); }
+      else if (rating === 'down') { downBtn.classList.add('bg-red-700','text-white'); upBtn.classList.add('bg-zinc-800/80','text-zinc-400'); }
+      else { upBtn.classList.add('bg-zinc-800/80','text-zinc-400'); downBtn.classList.add('bg-zinc-800/80','text-zinc-400'); }
+      upBtn.setAttribute('onclick',   `setRating(${gameId},'${rating ?? ''}','up',this)`);
+      downBtn.setAttribute('onclick', `setRating(${gameId},'${rating ?? ''}','down',this)`);
+    }
   }
 
   async function setHidden(gameId, hidden, card) {
-    try {
-      const resp = await fetch(`/library/games/${gameId}/hidden`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hidden }),
-      });
-      if (!resp.ok) return;
-      if (hidden) {
-        card.classList.add('opacity-40', 'border-dashed');
-        card.classList.remove('opacity-50');
-      } else {
-        card.classList.remove('opacity-40', 'border-dashed');
-      }
-      // Update the hide button's onclick and title
-      const hideBtn = card.querySelector('button[onclick*="setHidden"]');
-      hideBtn.setAttribute('onclick', `setHidden(${gameId}, ${!hidden}, this.closest('.game-card'))`);
-      hideBtn.setAttribute('title', hidden ? 'Unhide' : 'Hide');
-    } catch (e) {}
+    const resp = await fetch(`/library/games/${gameId}/hidden`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ hidden }),
+    });
+    if (!resp.ok) return;
+    if (hidden) { card.classList.add('opacity-40','border-dashed'); card.classList.remove('opacity-50'); }
+    else { card.classList.remove('opacity-40','border-dashed'); }
+    const hideBtn = card.querySelector('button[onclick*="setHidden"]');
+    hideBtn.setAttribute('onclick', `setHidden(${gameId},${!hidden},this.closest('.game-card'))`);
+    hideBtn.setAttribute('title', hidden ? 'Unhide' : 'Hide');
+  }
+
+  async function setHiddenList(gameId, hidden, row) {
+    const resp = await fetch(`/library/games/${gameId}/hidden`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ hidden }),
+    });
+    if (!resp.ok) return;
+    row.classList.toggle('opacity-40', hidden);
   }
 </script>
 
