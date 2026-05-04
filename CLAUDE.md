@@ -27,15 +27,27 @@ Use `kebab-case` after the prefix. Delete branches after merging.
 Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`. Add a body when the *why* isn't obvious. Never include secrets or PII in commit messages.
 
 ### Merging to main
-1. Run `pysonar --sonar-host-url=http://localhost:9000 --sonar-token=<token> --sonar-project-key=Steampunk`
-2. Confirm zero open issues: `GET /api/issues/search?projectKeys=Steampunk&statuses=OPEN` → `total` must be `0`
-3. Only then: `git checkout main && git merge --no-ff <branch>` then `git push origin main`
-4. Delete the branch
+1. Read SonarQube config from `gandalf.json` key `sonarqube` → `token`, `host`, `project_key`
+2. Run the scanner (full path required — not on PATH):
+   ```
+   & "C:\Users\rjing\AppData\Roaming\Python\Python313\Scripts\pysonar.exe" `
+     --sonar-host-url=<host> `
+     --sonar-token=<token> `
+     --sonar-project-key=<project_key>
+   ```
+3. Confirm zero open issues via the API:
+   ```powershell
+   $h = @{ Authorization = "Bearer <token>" }
+   (Invoke-RestMethod "http://localhost:9000/api/issues/search?projectKeys=Steampunk&statuses=OPEN&ps=1" -Headers $h).total
+   ```
+   Must return `0`. If not, fix all issues on the branch and re-scan.
+4. Only then: `git checkout main && git merge --no-ff <branch>` then `git push origin main`
+5. Delete the branch
 
 No PRs required (solo project). The SonarQube gate is the quality check.
 
 ### Secrets in sonar-project.properties
-`sonar-project.properties` is gitignored — never commit it. The SonarQube token lives in `gandalf.json`.
+`sonar-project.properties` is gitignored — never commit it. The SonarQube token lives in `gandalf.json` under key `sonarqube.token`.
 
 ## Feature Development Workflow
 
