@@ -711,8 +711,11 @@ async def library(request: Request, show_hidden: bool = False):
                 g.cover_url,
                 list_distinct(list(pl.slug))                           AS platforms,
                 MAX(l.playtime_mins)                                   AS playtime_mins,
+                MAX(CASE WHEN pl.slug = 'steam'  THEN l.playtime_mins END) AS steam_playtime_mins,
+                MAX(CASE WHEN pl.slug = 'switch' THEN l.playtime_mins END) AS switch_playtime_mins,
                 bool_and(l.never_launched)                             AS never_launched,
                 COALESCE(MAX(a.completion_pct), 0.0)                   AS achievement_pct,
+                COALESCE(MAX(spsn.trophy_progress), 0)                 AS trophy_pct,
                 bool_or(w.id IS NOT NULL)                              AS on_wishlist,
                 list_distinct(list(gn.name))                           AS genres,
                 COALESCE(bool_or(sa.platform_id = 1 AND sa.available), FALSE) AS available_on_steam,
@@ -723,12 +726,13 @@ async def library(request: Request, show_hidden: bool = False):
             JOIN platform_games pg ON pg.id = l.platform_game_id
             JOIN games g            ON g.id  = pg.game_id
             JOIN platforms pl       ON pl.id = pg.platform_id
-            LEFT JOIN achievements a  ON a.platform_game_id = pg.id
-            LEFT JOIN wishlist w      ON w.platform_game_id = pg.id
-            LEFT JOIN game_genres gg  ON gg.game_id = g.id
-            LEFT JOIN genres gn       ON gn.id = gg.genre_id
+            LEFT JOIN achievements a   ON a.platform_game_id = pg.id
+            LEFT JOIN wishlist w       ON w.platform_game_id = pg.id
+            LEFT JOIN game_genres gg   ON gg.game_id = g.id
+            LEFT JOIN genres gn        ON gn.id = gg.genre_id
             LEFT JOIN store_availability sa ON sa.game_id = g.id
             LEFT JOIN user_game_prefs ugp   ON ugp.game_id = g.id
+            LEFT JOIN stg_psn_library spsn  ON spsn.np_communication_id = pg.external_id
             WHERE (? OR NOT COALESCE(ugp.hidden, FALSE))
             GROUP BY g.id, g.title, g.cover_url, ugp.rating, ugp.hidden
             ORDER BY MAX(l.playtime_mins) DESC NULLS LAST
@@ -1016,49 +1020,53 @@ async def merge_games(request: Request, body: MergeBody):
         survive = a if na > nb or (na == nb and a < b) else b
         discard = b if survive == a else a
 
-        # Enrich surviving row: use chosen title if provided, else keep surviving's
-        chosen_title = body.preferred_title.strip() if body.preferred_title else None
-        conn.execute("""
-            UPDATE games SET
-                title     = COALESCE(?, title),
-                cover_url = COALESCE(cover_url, (SELECT cover_url FROM games WHERE id = ?)),
-                igdb_id   = COALESCE(igdb_id,   (SELECT igdb_id   FROM games WHERE id = ?))
-            WHERE id = ?
-        """, [chosen_title, discard, discard, survive])
+        chosen_title = (body.preferred_title or "").strip() or None
 
-        # Re-point all platform ownership to surviving row
-        conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
+        try:
+            conn.execute("BEGIN")
 
-        # Union junction tables (INSERT OR IGNORE skips duplicates)
-        conn.execute(
-            "INSERT OR IGNORE INTO game_tags (game_id, tag_id) SELECT ?, tag_id FROM game_tags WHERE game_id = ?",
-            [survive, discard],
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO game_genres (game_id, genre_id) SELECT ?, genre_id FROM game_genres WHERE game_id = ?",
-            [survive, discard],
-        )
-        conn.execute(
-            "INSERT OR IGNORE INTO store_availability (game_id, platform_id, available, external_id, checked_at) "
-            "SELECT ?, platform_id, available, external_id, checked_at FROM store_availability WHERE game_id = ?",
-            [survive, discard],
-        )
-        # Carry prefs from discard only if surviving row has none
-        conn.execute(
-            "INSERT OR IGNORE INTO user_game_prefs (game_id, rating, hidden, updated_at) "
-            "SELECT ?, rating, hidden, updated_at FROM user_game_prefs WHERE game_id = ?",
-            [survive, discard],
-        )
+            # Fetch discard fields before any modifications
+            discard_row = _query(conn, "SELECT title, cover_url, igdb_id FROM games WHERE id = ?", [discard])
+            if not discard_row:
+                conn.execute("ROLLBACK")
+                return JSONResponse({"error": "game not found"}, status_code=404)
+            d = discard_row[0]
 
-        # Delete discard's child rows then the game row itself
-        for table, col in [
-            ("game_tags", "game_id"),
-            ("game_genres", "game_id"),
-            ("store_availability", "game_id"),
-            ("user_game_prefs", "game_id"),
-        ]:
-            conn.execute(f"DELETE FROM {table} WHERE {col} = ?", [discard])
-        conn.execute("DELETE FROM games WHERE id = ?", [discard])
+            conn.execute(
+                "UPDATE games SET title = ?, cover_url = COALESCE(cover_url, ?), igdb_id = COALESCE(igdb_id, ?) WHERE id = ?",
+                [chosen_title or _query(conn, "SELECT title FROM games WHERE id = ?", [survive])[0]["title"],
+                 d["cover_url"], d["igdb_id"], survive],
+            )
+
+            conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
+
+            conn.execute(
+                "INSERT INTO game_tags (game_id, tag_id) SELECT ?, tag_id FROM game_tags WHERE game_id = ? ON CONFLICT DO NOTHING",
+                [survive, discard],
+            )
+            conn.execute(
+                "INSERT INTO game_genres (game_id, genre_id) SELECT ?, genre_id FROM game_genres WHERE game_id = ? ON CONFLICT DO NOTHING",
+                [survive, discard],
+            )
+            conn.execute(
+                "INSERT INTO store_availability (game_id, platform_id, available, external_id, checked_at) "
+                "SELECT ?, platform_id, available, external_id, checked_at FROM store_availability WHERE game_id = ? ON CONFLICT DO NOTHING",
+                [survive, discard],
+            )
+            conn.execute(
+                "INSERT INTO user_game_prefs (game_id, rating, hidden, updated_at) "
+                "SELECT ?, rating, hidden, updated_at FROM user_game_prefs WHERE game_id = ? ON CONFLICT DO NOTHING",
+                [survive, discard],
+            )
+
+            for table in ("game_tags", "game_genres", "store_availability", "user_game_prefs"):
+                conn.execute(f"DELETE FROM {table} WHERE game_id = ?", [discard])
+            conn.execute("DELETE FROM games WHERE id = ?", [discard])
+
+            conn.execute("COMMIT")
+        except Exception as exc:
+            conn.execute("ROLLBACK")
+            return JSONResponse({"error": str(exc)}, status_code=500)
 
     return JSONResponse({"surviving_game_id": survive})
 

@@ -152,35 +152,67 @@
     <div class="p-3">
       <p class="text-sm font-medium text-gray-200 truncate group-hover:text-white" title="{{ game.title }}">{{ game.title }}</p>
 
+      {% set multi = game.platforms | length > 1 %}
+      {% set default_plat = 'steam' if 'steam' in (game.platforms or []) else (game.platforms[0] if game.platforms else '') %}
+
       {% if game.platforms %}
       <div class="flex flex-wrap gap-1 mt-1.5">
         {% for platform in game.platforms %}
-        <span class="text-[9px] px-1.5 py-0.5 rounded font-medium
-          {% if platform == 'steam' %}bg-blue-900/60 text-blue-300 border border-blue-800
-          {% elif platform == 'gog' %}bg-purple-900/60 text-purple-300 border border-purple-800
-          {% else %}bg-zinc-800 text-zinc-400 border border-zinc-700{% endif %}">
-          {{ platform | upper }}
-        </span>
+        {% set badge_cls %}text-[9px] px-1.5 py-0.5 rounded font-medium border transition
+          {%- if platform == 'steam' %} bg-blue-900/60 text-blue-300 border-blue-800
+          {%- elif platform == 'gog' %} bg-purple-900/60 text-purple-300 border-purple-800
+          {%- else %} bg-zinc-800 text-zinc-400 border-zinc-700{%- endif %}
+          {%- if multi and platform == default_plat %} ring-1 ring-amber-500{%- endif %}{% endset %}
+        {% if multi %}
+        <button onclick="setActivePlatform('{{ game.game_id }}', '{{ platform }}', this)"
+          class="{{ badge_cls }}" data-platform="{{ platform }}">{{ platform | upper }}</button>
+        {% else %}
+        <span class="{{ badge_cls }}">{{ platform | upper }}</span>
+        {% endif %}
         {% endfor %}
-        {% if game.platforms | length > 1 %}
+        {% if multi %}
         <span class="text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-900/40 text-amber-400 border border-amber-800/60">&#x2715;{{ game.platforms | length }}</span>
         {% endif %}
       </div>
       {% endif %}
 
-      <div class="flex items-center justify-between mt-1.5">
-        {% set has_playtime = 'steam' in (game.platforms or []) %}
-        {% if has_playtime %}
-        <span class="text-xs text-zinc-500">
-          {% if game.playtime_mins and game.playtime_mins > 0 %}{{ (game.playtime_mins / 60) | round(1) }}h{% else %}Never played{% endif %}
-        </span>
-        {% else %}
-        <span class="text-xs text-zinc-600">Playtime unknown</span>
-        {% endif %}
-        {% if game.achievement_pct > 0 %}
-        <span class="text-xs text-amber-600">{{ game.achievement_pct | round(0) | int }}%</span>
-        {% endif %}
-      </div>
+      {% if multi %}
+        {% for platform in game.platforms %}
+        <div class="platform-stats flex items-center justify-between mt-1.5 {% if platform != default_plat %}hidden{% endif %}"
+             data-for="{{ platform }}">
+          {% if platform == 'steam' %}
+            <span class="text-xs text-zinc-500">
+              {% if game.steam_playtime_mins and game.steam_playtime_mins > 0 %}{{ (game.steam_playtime_mins / 60) | round(1) }}h{% else %}Never played{% endif %}
+            </span>
+            {% if game.achievement_pct > 0 %}<span class="text-xs text-amber-600">{{ game.achievement_pct | round(0) | int }}%</span>{% endif %}
+          {% elif platform == 'psn' %}
+            <span class="text-xs text-zinc-500">
+              {% if game.trophy_pct and game.trophy_pct > 0 %}{{ game.trophy_pct | round(0) | int }}% trophies{% else %}No trophies yet{% endif %}
+            </span>
+          {% elif platform == 'switch' %}
+            <span class="text-xs text-zinc-500">
+              {% if game.switch_playtime_mins and game.switch_playtime_mins > 0 %}{{ (game.switch_playtime_mins / 60) | round(1) }}h{% else %}Never played{% endif %}
+            </span>
+          {% else %}
+            <span class="text-xs text-zinc-600">No stats available</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="flex items-center justify-between mt-1.5">
+          {% set has_playtime = 'steam' in (game.platforms or []) %}
+          {% if has_playtime %}
+          <span class="text-xs text-zinc-500">
+            {% if game.playtime_mins and game.playtime_mins > 0 %}{{ (game.playtime_mins / 60) | round(1) }}h{% else %}Never played{% endif %}
+          </span>
+          {% else %}
+          <span class="text-xs text-zinc-600">Playtime unknown</span>
+          {% endif %}
+          {% if game.achievement_pct > 0 %}
+          <span class="text-xs text-amber-600">{{ game.achievement_pct | round(0) | int }}%</span>
+          {% endif %}
+        </div>
+      {% endif %}
 
       {% if game.genres %}
       <div class="flex flex-wrap gap-1 mt-2">
@@ -546,6 +578,19 @@
       const visible = applyGridFilters();
       updateDragState(visible);
     }
+  }
+
+  // ── Platform badge toggle (multi-platform cards) ─────────────────────────────
+  function setActivePlatform(gameId, platform, btn) {
+    const card = btn.closest('.game-card');
+    card.querySelectorAll('.platform-stats').forEach(el => {
+      el.classList.toggle('hidden', el.dataset.for !== platform);
+    });
+    card.querySelectorAll('[data-platform]').forEach(b => {
+      const active = b.dataset.platform === platform;
+      b.classList.toggle('ring-1', active);
+      b.classList.toggle('ring-amber-500', active);
+    });
   }
 
   // ── Drag-to-merge ────────────────────────────────────────────────────────────
