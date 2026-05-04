@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import json
@@ -9,10 +10,10 @@ import urllib.parse
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import duckdb
-import requests as req
+import httpx
 from fastapi import BackgroundTasks, FastAPI, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -62,12 +63,16 @@ def _user(request: Request) -> dict | None:
 
 
 MAX_LOG_FILES = 10
+_LOG_GLOB = "sync_*.log"
+_URL_LIBRARY = "/library"
+_URL_SETUP = "/setup"
+_URL_WIZARD_STEAM_API = "/wizard/steam-api"
 
 
 def _trim_logs() -> None:
     if not LOGS_DIR.exists():
         return
-    for old in sorted(LOGS_DIR.glob("sync_*.log"), reverse=True)[MAX_LOG_FILES:]:
+    for old in sorted(LOGS_DIR.glob(_LOG_GLOB), reverse=True)[MAX_LOG_FILES:]:
         old.unlink(missing_ok=True)
 
 
@@ -77,7 +82,7 @@ def _run_sync(platforms: list[str] | None = None):
         _sync_running = True
     try:
         LOGS_DIR.mkdir(exist_ok=True)
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d_%H-%M-%S")
         log_path = LOGS_DIR / f"sync_{timestamp}.log"
         cmd = [sys.executable, "-u", str(SRC_DIR / "collect.py")]
         if platforms:
@@ -126,7 +131,7 @@ class _WizardGate(BaseHTTPMiddleware):
             return await call_next(request)
         fresh = load_secrets()
         if not fresh.get("steam", {}).get("api_key"):
-            return RedirectResponse("/wizard/steam-api", status_code=302)
+            return RedirectResponse(_URL_WIZARD_STEAM_API, status_code=302)
         return await call_next(request)
 
 
@@ -152,7 +157,7 @@ templates.env.globals["timezone"] = secrets["app"].get("timezone", "UTC")
 @app.get("/")
 async def login_page(request: Request):
     if _user(request):
-        return RedirectResponse("/library", status_code=302)
+        return RedirectResponse(_URL_LIBRARY, status_code=302)
     return templates.TemplateResponse(request, "login.html")
 
 
@@ -173,7 +178,7 @@ async def auth_callback(request: Request):
 
     fresh = load_secrets()
     if not fresh.get("steam", {}).get("api_key"):
-        return RedirectResponse("/wizard/steam-api", status_code=302)
+        return RedirectResponse(_URL_WIZARD_STEAM_API, status_code=302)
 
     if fresh["steam"].get("steam_id64") != steam_id:
         save_secrets({"steam": {"steam_id64": steam_id}})
@@ -184,7 +189,7 @@ async def auth_callback(request: Request):
 
     if not fresh["steam"].get("session_cookie"):
         return RedirectResponse("/wizard/steam-cookie", status_code=302)
-    return RedirectResponse("/library", status_code=302)
+    return RedirectResponse(_URL_LIBRARY, status_code=302)
 
 
 @app.get("/logout")
@@ -224,7 +229,7 @@ async def auth_gog(request: Request):
 
 
 @app.post("/auth/gog/connect")
-async def auth_gog_connect(request: Request, callback_url: str = Form(...)):
+async def auth_gog_connect(request: Request, callback_url: Annotated[str, Form()]):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
 
@@ -244,17 +249,18 @@ async def auth_gog_connect(request: Request, callback_url: str = Form(...)):
     gog = fresh.get("gog", {})
 
     try:
-        resp = req.post(
-            "https://auth.gog.com/token",
-            data={
-                "client_id": gog.get("client_id"),
-                "client_secret": gog.get("client_secret"),
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": _GOG_REDIRECT_URI,
-            },
-            timeout=15,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://auth.gog.com/token",
+                data={
+                    "client_id": gog.get("client_id"),
+                    "client_secret": gog.get("client_secret"),
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": _GOG_REDIRECT_URI,
+                },
+                timeout=15,
+            )
         resp.raise_for_status()
         token_data = resp.json()
     except Exception:
@@ -282,7 +288,7 @@ async def auth_gog_disconnect(request: Request):
         return RedirectResponse("/", status_code=302)
 
     save_secrets({"gog": {"access_token": None, "refresh_token": None, "expires_at": None, "auth_expired": False}})
-    return RedirectResponse("/setup", status_code=302)
+    return RedirectResponse(_URL_SETUP, status_code=302)
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +296,7 @@ async def auth_gog_disconnect(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/auth/psn/connect")
-async def auth_psn_connect(request: Request, npsso: str = Form(...)):
+async def auth_psn_connect(request: Request, npsso: Annotated[str, Form()]):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
 
@@ -309,7 +315,7 @@ async def auth_psn_connect(request: Request, npsso: str = Form(...)):
             if expires_in:
                 npsso_expires_at = (datetime.now(UTC) + timedelta(seconds=int(expires_in))).isoformat()
             token = parsed.get("npsso", token)
-        except (json.JSONDecodeError, AttributeError, ValueError):
+        except (AttributeError, ValueError):
             pass
     token = token.strip('"')
 
@@ -338,7 +344,7 @@ async def auth_psn_disconnect(request: Request):
         return RedirectResponse("/", status_code=302)
 
     save_secrets({"psn": {"npsso": None, "npsso_expires_at": None, "access_token": None, "refresh_token": None, "expires_at": None, "auth_expired": False}})
-    return RedirectResponse("/setup", status_code=302)
+    return RedirectResponse(_URL_SETUP, status_code=302)
 
 
 # ---------------------------------------------------------------------------
@@ -396,7 +402,7 @@ async def auth_switch(request: Request):
 
 
 @app.post("/auth/switch/connect")
-async def auth_switch_connect(request: Request, redirect_url: str = Form(...)):
+async def auth_switch_connect(request: Request, redirect_url: Annotated[str, Form()]):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
 
@@ -424,19 +430,20 @@ async def auth_switch_connect(request: Request, redirect_url: str = Form(...)):
         return RedirectResponse(error_dest, status_code=302)
 
     try:
-        resp = req.post(
-            "https://accounts.nintendo.com/connect/1.0.0/api/session_token",
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-            },
-            data={
-                "client_id": _NINTENDO_PCTL_CLIENT_ID,
-                "session_token_code": session_token_code,
-                "session_token_code_verifier": code_verifier,
-            },
-            timeout=15,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://accounts.nintendo.com/connect/1.0.0/api/session_token",
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+                data={
+                    "client_id": _NINTENDO_PCTL_CLIENT_ID,
+                    "session_token_code": session_token_code,
+                    "session_token_code_verifier": code_verifier,
+                },
+                timeout=15,
+            )
         resp.raise_for_status()
         session_token = resp.json().get("session_token")
     except Exception:
@@ -467,14 +474,14 @@ async def auth_switch_disconnect(request: Request):
         return RedirectResponse("/", status_code=302)
 
     save_secrets({"switch": {"session_token": None, "auth_expired": False}})
-    return RedirectResponse("/setup", status_code=302)
+    return RedirectResponse(_URL_SETUP, status_code=302)
 
 
 # ---------------------------------------------------------------------------
 # App routes
 # ---------------------------------------------------------------------------
 
-@app.get("/library")
+@app.get(_URL_LIBRARY)
 async def library(request: Request, show_hidden: bool = False):
     user = _user(request)
     if not user:
@@ -561,7 +568,7 @@ async def profile(request: Request):
     })
 
 
-@app.get("/setup")
+@app.get(_URL_SETUP)
 async def setup_page(
     request: Request,
     error: str = "",
@@ -595,8 +602,8 @@ async def setup_page(
     })
 
 
-@app.post("/setup")
-async def setup_save(request: Request, session_cookie: str = Form(...)):
+@app.post(_URL_SETUP)
+async def setup_save(request: Request, session_cookie: Annotated[str, Form()]):
     user = _user(request)
     if not user:
         return RedirectResponse("/", status_code=302)
@@ -604,14 +611,14 @@ async def setup_save(request: Request, session_cookie: str = Form(...)):
     cookie = session_cookie.strip()
     save_secrets({"steam": {"session_cookie": cookie}})
     secrets["steam"]["session_cookie"] = cookie
-    return RedirectResponse("/library", status_code=302)
+    return RedirectResponse(_URL_LIBRARY, status_code=302)
 
 
 @app.post("/sync")
 async def sync(
     request: Request,
     background_tasks: BackgroundTasks,
-    platforms: str = Form("all"),
+    platforms: Annotated[str, Form()] = "all",
 ):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
@@ -633,7 +640,7 @@ async def preferences_page(request: Request):
 
 
 @app.post("/preferences")
-async def preferences_save(request: Request, timezone: str = Form(...)):
+async def preferences_save(request: Request, timezone: Annotated[str, Form()]):
     user = _user(request)
     if not user:
         return RedirectResponse("/", status_code=302)
@@ -651,14 +658,18 @@ async def logs_page(request: Request, file: str = ""):
     if not user:
         return RedirectResponse("/", status_code=302)
 
-    log_files = sorted(LOGS_DIR.glob("sync_*.log"), reverse=True) if LOGS_DIR.exists() else []
+    log_files = sorted(LOGS_DIR.glob(_LOG_GLOB), reverse=True) if LOGS_DIR.exists() else []
     file_names = [f.name for f in log_files]
 
-    selected = file if file in file_names else (file_names[0] if file_names else None)
+    if file in file_names:
+        selected = file
+    elif file_names:
+        selected = file_names[0]
+    else:
+        selected = None
     lines: list[str] = []
     if selected:
-        with open(LOGS_DIR / selected) as f:
-            lines = f.readlines()
+        lines = await asyncio.to_thread(lambda: (LOGS_DIR / selected).read_text().splitlines(True))
 
     return templates.TemplateResponse(request, "logs.html", {
         "user": user,
@@ -674,7 +685,7 @@ async def logs_clear(request: Request):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
     if not _sync_running and LOGS_DIR.exists():
-        for f in LOGS_DIR.glob("sync_*.log"):
+        for f in LOGS_DIR.glob(_LOG_GLOB):
             f.unlink(missing_ok=True)
     return RedirectResponse("/logs", status_code=302)
 
@@ -725,7 +736,7 @@ async def set_hidden(request: Request, game_id: int, body: HiddenBody):
 # Wizard routes
 # ---------------------------------------------------------------------------
 
-@app.get("/wizard/steam-api")
+@app.get(_URL_WIZARD_STEAM_API)
 async def wizard_steam_api(request: Request, error: str = ""):
     fresh = load_secrets()
     steam = fresh.get("steam", {})
@@ -737,21 +748,22 @@ async def wizard_steam_api(request: Request, error: str = ""):
     })
 
 
-@app.post("/wizard/steam-api")
+@app.post(_URL_WIZARD_STEAM_API)
 async def wizard_steam_api_save(
     request: Request,
-    api_key: str = Form(...),
-    vanity_id: str = Form(...),
+    api_key: Annotated[str, Form()],
+    vanity_id: Annotated[str, Form()],
 ):
     key = api_key.strip()
     vanity = vanity_id.strip()
 
     try:
-        resp = req.get(
-            "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/",
-            params={"key": key, "vanityurl": vanity},
-            timeout=10,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/",
+                params={"key": key, "vanityurl": vanity},
+                timeout=10,
+            )
         resp.raise_for_status()
         data = resp.json().get("response", {})
         if data.get("success") != 1:
@@ -779,7 +791,7 @@ async def wizard_steam_cookie(request: Request, error: str = ""):
 
 
 @app.post("/wizard/steam-cookie")
-async def wizard_steam_cookie_save(request: Request, session_cookie: str = Form(...)):
+async def wizard_steam_cookie_save(request: Request, session_cookie: Annotated[str, Form()]):
     user = _user(request)
     if not user:
         return RedirectResponse("/", status_code=302)
@@ -832,7 +844,7 @@ async def wizard_complete(request: Request, background_tasks: BackgroundTasks):
     request.session.pop("wizard_active", None)
     if not _sync_running:
         background_tasks.add_task(_run_sync, None)
-    return RedirectResponse("/library", status_code=302)
+    return RedirectResponse(_URL_LIBRARY, status_code=302)
 
 
 @app.get("/wizard/restart")
@@ -840,4 +852,4 @@ async def wizard_restart(request: Request):
     if not _user(request):
         return RedirectResponse("/", status_code=302)
     request.session["wizard_active"] = True
-    return RedirectResponse("/wizard/steam-api", status_code=302)
+    return RedirectResponse(_URL_WIZARD_STEAM_API, status_code=302)

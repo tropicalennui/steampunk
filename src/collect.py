@@ -60,6 +60,7 @@ NINTENDO_PCTL_APP_BUILD = "660"
 NINTENDO_PCTL_OS_VERSION = "26"
 NINTENDO_PCTL_USER_AGENT = f"moon_ANDROID/{NINTENDO_PCTL_APP_VERSION} (com.nintendo.znma; build:{NINTENDO_PCTL_APP_BUILD}; ANDROID {NINTENDO_PCTL_OS_VERSION})"
 NINTENDO_DELAY = 0.5
+_ACCEPT_JSON = "application/json"
 
 
 # ---------------------------------------------------------------------------
@@ -734,6 +735,22 @@ def _mark_psn_auth_expired(secrets: dict) -> None:
     secrets["psn"]["auth_expired"] = True
 
 
+def _psn_token_still_valid(secrets: dict, access_token: str, expires_at_str: str) -> Optional[str]:
+    """Return a current token (refreshing if near expiry), or None if refresh failed."""
+    if not expires_at_str:
+        return access_token
+    try:
+        expires_at = datetime.fromisoformat(expires_at_str)
+        if datetime.now(UTC) >= expires_at - timedelta(seconds=60):
+            print("  PSN token expiring — refreshing...")
+            if not refresh_psn_token(secrets):
+                return None
+            return secrets["psn"]["access_token"]
+    except ValueError:
+        pass
+    return access_token
+
+
 def _ensure_psn_token(secrets: dict) -> Optional[str]:
     """Return a valid PSN access token, exchanging NPSSO or refreshing as needed."""
     psn = secrets.get("psn", {})
@@ -741,21 +758,10 @@ def _ensure_psn_token(secrets: dict) -> Optional[str]:
     # explicitly rejects the NPSSO (i.e. _NpssoExpired is raised below).
     if psn.get("auth_expired"):
         psn["auth_expired"] = False
-    access_token = psn.get("access_token")
-    expires_at_str = psn.get("expires_at")
 
+    access_token = psn.get("access_token")
     if access_token:
-        if expires_at_str:
-            try:
-                expires_at = datetime.fromisoformat(expires_at_str)
-                if datetime.now(UTC) >= expires_at - timedelta(seconds=60):
-                    print("  PSN token expiring — refreshing...")
-                    if not refresh_psn_token(secrets):
-                        return None
-                    return secrets["psn"]["access_token"]
-            except ValueError:
-                pass
-        return access_token
+        return _psn_token_still_valid(secrets, access_token, psn.get("expires_at", ""))
 
     # No access token — try to exchange NPSSO
     npsso = psn.get("npsso")
@@ -795,29 +801,34 @@ def _ensure_psn_token(secrets: dict) -> Optional[str]:
 # PSN — fetch helpers
 # ---------------------------------------------------------------------------
 
+def _fetch_psn_trophy_page(access_token: str, service: str, offset: int) -> Optional[dict]:
+    """Fetch one page of trophy titles; returns parsed JSON or None on error/end."""
+    try:
+        resp = requests.get(
+            f"{PSN_TROPHY_URL}/users/me/trophyTitles",
+            params={"npServiceName": service, "limit": 800, "offset": offset},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=15,
+        )
+    except requests.RequestException as e:
+        print(f"  PSN trophy titles fetch failed: {e}")
+        return None
+    if not resp.ok:
+        if resp.status_code != 404:
+            print(f"  PSN trophy titles ({service}): HTTP {resp.status_code}")
+        return None
+    return resp.json()
+
+
 def fetch_psn_trophy_titles(access_token: str) -> list[dict]:
     """Return all trophy title entries for the authenticated user (PS4 + PS5)."""
     titles = []
-    for service in ("trophy", "trophy2"):  # trophy = PS3/PS4, trophy2 = PS5
+    for service in ("trophy", "trophy2"):  # PS3/PS4 endpoint first, then PS5
         offset = 0
         while True:
-            try:
-                resp = requests.get(
-                    f"{PSN_TROPHY_URL}/users/me/trophyTitles",
-                    params={"npServiceName": service, "limit": 800, "offset": offset},
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    timeout=15,
-                )
-            except requests.RequestException as e:
-                print(f"  PSN trophy titles fetch failed: {e}")
+            data = _fetch_psn_trophy_page(access_token, service, offset)
+            if data is None:
                 break
-
-            if not resp.ok:
-                if resp.status_code != 404:
-                    print(f"  PSN trophy titles ({service}): HTTP {resp.status_code}")
-                break
-
-            data = resp.json()
             page = data.get("trophyTitles", [])
             titles.extend(page)
             total = data.get("totalItemCount", 0)
@@ -961,7 +972,7 @@ def _get_switch_auth(session_token: str) -> Optional[dict]:
             f"{NINTENDO_ACCOUNTS_URL}/connect/1.0.0/api/token",
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
+                "Accept": _ACCEPT_JSON,
             },
             data={
                 "client_id": NINTENDO_PCTL_CLIENT_ID,
@@ -984,7 +995,7 @@ def _get_switch_auth(session_token: str) -> Optional[dict]:
     try:
         user_resp = requests.get(
             NINTENDO_NA_USER_URL,
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            headers={"Authorization": f"Bearer {access_token}", "Accept": _ACCEPT_JSON},
             timeout=15,
         )
         user_resp.raise_for_status()
@@ -1031,7 +1042,7 @@ def _pctl_headers(access_token: str) -> dict:
         "X-Moon-App-Display-Version": NINTENDO_PCTL_APP_VERSION,
         "X-Moon-App-Internal-Version": NINTENDO_PCTL_APP_BUILD,
         "User-Agent": NINTENDO_PCTL_USER_AGENT,
-        "Accept": "application/json",
+        "Accept": _ACCEPT_JSON,
     }
 
 
@@ -1090,6 +1101,40 @@ def _parse_summaries(data: dict | list, label: str) -> list[dict]:
     return results
 
 
+def _fetch_switch_summaries(access_token: str, device_id: str, by_uid: dict) -> bool:
+    """Try monthly then daily summaries for one device; merge into by_uid. Returns True if data found."""
+    for endpoint, label in [
+        (f"{NINTENDO_PCTL_URL}/moon/v1/devices/{device_id}/monthly_summaries", "monthly_summaries"),
+        (f"{NINTENDO_PCTL_URL}/moon/v1/devices/{device_id}/daily_summaries",   "daily_summaries"),
+    ]:
+        try:
+            resp = requests.get(endpoint, headers=_pctl_headers(access_token), timeout=30)
+        except requests.RequestException as e:
+            print(f"  {label} request error: {e}")
+            continue
+
+        if not resp.ok:
+            print(f"  {label} failed: {resp.status_code} — {resp.text[:300]}")
+            continue
+
+        data = resp.json()
+        print(f"  PCTL {label} raw: {json.dumps(data)[:2000]}")
+
+        for record in _parse_summaries(data, label):
+            ns_uid = record["ns_uid"]
+            if ns_uid in by_uid:
+                by_uid[ns_uid]["play_time_mins"] += record["play_time_mins"]
+            else:
+                by_uid[ns_uid] = record
+
+        time.sleep(NINTENDO_DELAY)
+
+        if by_uid:
+            return True  # monthly had data — skip daily
+
+    return False
+
+
 def fetch_switch_library(access_token: str, device_ids: list[str]) -> list[dict]:
     """
     Fetch play history across all linked devices, trying monthly then daily summaries.
@@ -1100,35 +1145,7 @@ def fetch_switch_library(access_token: str, device_ids: list[str]) -> list[dict]
 
     for device_id in device_ids:
         print(f"  Fetching Switch library for device {device_id}...")
-
-        for endpoint, label in [
-            (f"{NINTENDO_PCTL_URL}/moon/v1/devices/{device_id}/monthly_summaries", "monthly_summaries"),
-            (f"{NINTENDO_PCTL_URL}/moon/v1/devices/{device_id}/daily_summaries",   "daily_summaries"),
-        ]:
-            try:
-                resp = requests.get(endpoint, headers=_pctl_headers(access_token), timeout=30)
-            except requests.RequestException as e:
-                print(f"  {label} request error: {e}")
-                continue
-
-            if not resp.ok:
-                print(f"  {label} failed: {resp.status_code} — {resp.text[:300]}")
-                continue
-
-            data = resp.json()
-            print(f"  PCTL {label} raw: {json.dumps(data)[:2000]}")
-
-            for record in _parse_summaries(data, label):
-                ns_uid = record["ns_uid"]
-                if ns_uid in by_uid:
-                    by_uid[ns_uid]["play_time_mins"] += record["play_time_mins"]
-                else:
-                    by_uid[ns_uid] = record
-
-            time.sleep(NINTENDO_DELAY)
-
-            if by_uid:
-                break  # monthly had data — skip daily
+        _fetch_switch_summaries(access_token, device_id, by_uid)
 
     if not by_uid:
         print(
@@ -1504,161 +1521,179 @@ def run_store_availability(
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry point — per-platform sync helpers
 # ---------------------------------------------------------------------------
+
+def _sync_steam(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+    api_key = secrets["steam"]["api_key"]
+    steam_id = secrets["steam"]["steam_id64"]
+    session = make_read_session(api_key, secrets["steam"].get("session_cookie"))
+
+    print("Fetching Steam library...")
+    games = fetch_library(session, steam_id)
+    print(f"  {len(games)} games found")
+
+    print(f"Fetching app details for {len(games)} games (may take a few minutes)...")
+    details: dict[int, Optional[dict]] = {}
+    for i, game in enumerate(games, 1):
+        details[game["appid"]] = fetch_app_details(game["appid"])
+        if i % 25 == 0:
+            print(f"  {i}/{len(games)}")
+        time.sleep(STORE_DELAY)
+    print(f"  Done — {sum(1 for d in details.values() if d)} apps returned data")
+
+    print("Fetching achievements...")
+    achievements: dict[int, tuple[int, int, float]] = {}
+    for i, game in enumerate(games, 1):
+        result = fetch_achievements(session, steam_id, game["appid"])
+        if result:
+            achievements[game["appid"]] = result
+        if i % 50 == 0:
+            print(f"  {i}/{len(games)}")
+        time.sleep(ACH_DELAY)
+    print(f"  {len(achievements)} games have achievement data")
+
+    print("Fetching wishlist...")
+    wishlist = fetch_wishlist(session, steam_id)
+    print(f"  {len(wishlist)} items on wishlist")
+
+    print("Staging Steam data...")
+    stage(conn, games, details, achievements, wishlist)
+
+    print("Promoting Steam data to canonical tables...")
+    promote(conn)
+
+
+def _sync_gog(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+    gog_cfg = secrets.get("gog", {})
+    if not (gog_cfg.get("access_token") and not gog_cfg.get("auth_expired")):
+        print("\nGOG not connected or auth expired — skipping GOG sync")
+        return
+
+    print("\nFetching GOG library...")
+    access_token = _ensure_gog_token(secrets)
+    if not access_token:
+        print("  GOG token unavailable after refresh attempt — skipping GOG sync")
+        return
+
+    product_ids = fetch_gog_library(access_token)
+    print(f"  {len(product_ids)} GOG games found")
+
+    print(f"Fetching GOG product details for {len(product_ids)} games...")
+    products = []
+    for i, pid in enumerate(product_ids, 1):
+        product = fetch_gog_product(pid, access_token)
+        if product:
+            products.append(product)
+        if i % 25 == 0:
+            print(f"  {i}/{len(product_ids)}")
+        time.sleep(GOG_DELAY)
+    print(f"  {len(products)} products fetched")
+
+    print("Staging GOG data...")
+    stage_gog(conn, products)
+
+    print("Promoting GOG data to canonical tables...")
+    promote_gog(conn)
+
+
+def _sync_psn(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+    psn_cfg = secrets.get("psn", {})
+    if not (psn_cfg.get("npsso") or psn_cfg.get("access_token")):
+        print("\nPSN not connected — skipping PSN sync")
+        return
+
+    print("\nFetching PSN library...")
+    access_token = _ensure_psn_token(secrets)
+    if access_token:
+        titles = fetch_psn_trophy_titles(access_token)
+        print(f"  {len(titles)} PSN titles found")
+        print("Staging PSN data...")
+        stage_psn(conn, titles)
+        print("Promoting PSN data to canonical tables...")
+        promote_psn(conn)
+    elif secrets.get("psn", {}).get("auth_expired"):
+        print("  PSN session expired — reconnect via Setup page")
+    else:
+        print("  PSN token unavailable — skipping PSN sync")
+
+
+def _sync_switch(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+    switch_cfg = secrets.get("switch", {})
+    if not (switch_cfg.get("session_token") and not switch_cfg.get("auth_expired")):
+        print("\nNintendo Switch not connected — skipping Switch sync")
+        return
+
+    print("\nFetching Nintendo Switch library...")
+    switch_auth = _ensure_switch_auth(secrets)
+    if not switch_auth:
+        if secrets.get("switch", {}).get("auth_expired"):
+            print("  Nintendo Switch session expired — reconnect via Setup page")
+        else:
+            print("  Nintendo Switch token unavailable — skipping Switch sync")
+        return
+
+    access_token = switch_auth["access_token"]
+    device_ids = fetch_switch_devices(access_token, switch_auth["user_id"])
+    print(f"  {len(device_ids)} Switch device(s) found")
+    if not device_ids:
+        print("  No Switch devices linked to this account — skipping Switch sync")
+        return
+
+    games = fetch_switch_library(access_token, device_ids)
+    print(f"  {len(games)} Switch games found")
+    print("Staging Switch data...")
+    stage_switch(conn, games)
+    print("Promoting Switch data to canonical tables...")
+    promote_switch(conn)
+
+
+def _sync_igdb(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+    igdb_cfg = secrets.get("igdb", {})
+    igdb_client_id = igdb_cfg.get("client_id")
+    igdb_client_secret = igdb_cfg.get("client_secret")
+    if not (igdb_client_id and igdb_client_secret):
+        print("\nIGDB credentials not configured — skipping matching and availability passes")
+        return
+
+    print("\nFetching IGDB token...")
+    igdb_token = get_igdb_token(igdb_client_id, igdb_client_secret)
+    if not igdb_token:
+        print("  Could not obtain IGDB token — skipping matching and availability passes")
+        return
+
+    print("Running IGDB matching pass...")
+    run_igdb_matching(conn, igdb_token, igdb_client_id)
+    print("Running store availability pass...")
+    run_store_availability(conn, igdb_token, igdb_client_id)
+
 
 def run(platforms: set[str] = frozenset({"steam", "gog", "psn"})) -> None:
     secrets = load_secrets()
     init_db()
     conn = connect()
 
-    # --- Steam sync ---
-    api_key = secrets["steam"]["api_key"]
-    steam_id = secrets["steam"]["steam_id64"]
-    session_cookie = secrets["steam"].get("session_cookie")
-    session = make_read_session(api_key, session_cookie)
-
     if "steam" in platforms:
-        print("Fetching Steam library...")
-        games = fetch_library(session, steam_id)
-        print(f"  {len(games)} games found")
-
-        print(f"Fetching app details for {len(games)} games (may take a few minutes)...")
-        details: dict[int, Optional[dict]] = {}
-        for i, game in enumerate(games, 1):
-            details[game["appid"]] = fetch_app_details(game["appid"])
-            if i % 25 == 0:
-                print(f"  {i}/{len(games)}")
-            time.sleep(STORE_DELAY)
-        print(f"  Done — {sum(1 for d in details.values() if d)} apps returned data")
-
-        print("Fetching achievements...")
-        achievements: dict[int, tuple[int, int, float]] = {}
-        for i, game in enumerate(games, 1):
-            result = fetch_achievements(session, steam_id, game["appid"])
-            if result:
-                achievements[game["appid"]] = result
-            if i % 50 == 0:
-                print(f"  {i}/{len(games)}")
-            time.sleep(ACH_DELAY)
-        print(f"  {len(achievements)} games have achievement data")
-
-        print("Fetching wishlist...")
-        wishlist = fetch_wishlist(session, steam_id)
-        print(f"  {len(wishlist)} items on wishlist")
-
-        print("Staging Steam data...")
-        stage(conn, games, details, achievements, wishlist)
-
-        print("Promoting Steam data to canonical tables...")
-        promote(conn)
+        _sync_steam(conn, secrets)
     else:
         print("Skipping Steam sync (not selected)")
 
-    # --- GOG sync ---
-    gog_cfg = secrets.get("gog", {})
     if "gog" in platforms:
-        if gog_cfg.get("access_token") and not gog_cfg.get("auth_expired"):
-            print("\nFetching GOG library...")
-            access_token = _ensure_gog_token(secrets)
-            if access_token:
-                product_ids = fetch_gog_library(access_token)
-                print(f"  {len(product_ids)} GOG games found")
-
-                print(f"Fetching GOG product details for {len(product_ids)} games...")
-                products = []
-                for i, pid in enumerate(product_ids, 1):
-                    product = fetch_gog_product(pid, access_token)
-                    if product:
-                        products.append(product)
-                    if i % 25 == 0:
-                        print(f"  {i}/{len(product_ids)}")
-                    time.sleep(GOG_DELAY)
-                print(f"  {len(products)} products fetched")
-
-                print("Staging GOG data...")
-                stage_gog(conn, products)
-
-                print("Promoting GOG data to canonical tables...")
-                promote_gog(conn)
-            else:
-                print("  GOG token unavailable after refresh attempt — skipping GOG sync")
-        else:
-            print("\nGOG not connected or auth expired — skipping GOG sync")
+        _sync_gog(conn, secrets)
     else:
         print("\nSkipping GOG sync (not selected)")
 
-    # --- PSN sync ---
-    psn_cfg = secrets.get("psn", {})
     if "psn" in platforms:
-        if psn_cfg.get("npsso") or psn_cfg.get("access_token"):
-            print("\nFetching PSN library...")
-            access_token = _ensure_psn_token(secrets)
-            if access_token:
-                titles = fetch_psn_trophy_titles(access_token)
-                print(f"  {len(titles)} PSN titles found")
-
-                print("Staging PSN data...")
-                stage_psn(conn, titles)
-
-                print("Promoting PSN data to canonical tables...")
-                promote_psn(conn)
-            elif secrets.get("psn", {}).get("auth_expired"):
-                print("  PSN session expired — reconnect via Setup page")
-            else:
-                print("  PSN token unavailable — skipping PSN sync")
-        else:
-            print("\nPSN not connected — skipping PSN sync")
+        _sync_psn(conn, secrets)
     else:
         print("\nSkipping PSN sync (not selected)")
 
-    # --- Switch sync ---
-    switch_cfg = secrets.get("switch", {})
     if "switch" in platforms:
-        if switch_cfg.get("session_token") and not switch_cfg.get("auth_expired"):
-            print("\nFetching Nintendo Switch library...")
-            switch_auth = _ensure_switch_auth(secrets)
-            if switch_auth:
-                access_token = switch_auth["access_token"]
-                user_id = switch_auth["user_id"]
-                device_ids = fetch_switch_devices(access_token, user_id)
-                print(f"  {len(device_ids)} Switch device(s) found")
-                if device_ids:
-                    games = fetch_switch_library(access_token, device_ids)
-                    print(f"  {len(games)} Switch games found")
-                    print("Staging Switch data...")
-                    stage_switch(conn, games)
-                    print("Promoting Switch data to canonical tables...")
-                    promote_switch(conn)
-                else:
-                    print("  No Switch devices linked to this account — skipping Switch sync")
-            elif secrets.get("switch", {}).get("auth_expired"):
-                print("  Nintendo Switch session expired — reconnect via Setup page")
-            else:
-                print("  Nintendo Switch token unavailable — skipping Switch sync")
-        else:
-            print("\nNintendo Switch not connected — skipping Switch sync")
+        _sync_switch(conn, secrets)
     else:
         print("\nSkipping Switch sync (not selected)")
 
-    # --- IGDB matching pass ---
-    igdb_cfg = secrets.get("igdb", {})
-    igdb_client_id = igdb_cfg.get("client_id")
-    igdb_client_secret = igdb_cfg.get("client_secret")
-
-    if igdb_client_id and igdb_client_secret:
-        print("\nFetching IGDB token...")
-        igdb_token = get_igdb_token(igdb_client_id, igdb_client_secret)
-        if igdb_token:
-            print("Running IGDB matching pass...")
-            run_igdb_matching(conn, igdb_token, igdb_client_id)
-
-            print("Running store availability pass...")
-            run_store_availability(conn, igdb_token, igdb_client_id)
-        else:
-            print("  Could not obtain IGDB token — skipping matching and availability passes")
-    else:
-        print("\nIGDB credentials not configured — skipping matching and availability passes")
+    _sync_igdb(conn, secrets)
 
     conn.close()
     print("\nAll done.")

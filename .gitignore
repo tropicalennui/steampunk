@@ -15,6 +15,8 @@ src/bundled_credentials.py
 .env
 .env.*
 !.env.example
+sonar-project.properties
+.sonar/
 
 # ─── PII / Sensitive Data ───────────────────────────────────────────────────────
 # Flat files that may contain personal data
