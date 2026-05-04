@@ -20,7 +20,7 @@ def get_auth_url(return_to: str, realm: str) -> str:
 
 def verify_callback(params: dict) -> str | None:
     """Verify the OpenID assertion with Steam and return SteamID64, or None on failure."""
-    verify_params = {k: v for k, v in params.items()}
+    verify_params = dict(params)
     verify_params["openid.mode"] = "check_authentication"
 
     resp = requests.post(STEAM_OPENID_URL, data=verify_params, timeout=10)

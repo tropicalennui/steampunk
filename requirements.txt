@@ -2,6 +2,7 @@ duckdb>=1.5.0
 fastapi
 uvicorn[standard]
 jinja2
+httpx
 requests
 itsdangerous
 python-multipart
