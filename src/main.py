@@ -1041,7 +1041,12 @@ async def merge_games(request: Request, body: MergeBody):
                 [final_title, final_cover, final_igdb, survive],
             )
 
-            conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
+            # Save the discard platform_game IDs before touching game_id
+            discard_pg_ids = [
+                r["id"] for r in _query(conn, "SELECT id FROM platform_games WHERE game_id = ?", [discard])
+            ]
+            # Null out the FK so the games row can be deleted without a cascade-check violation
+            conn.execute("UPDATE platform_games SET game_id = NULL WHERE game_id = ?", [discard])
 
             conn.execute(
                 "INSERT INTO game_tags (game_id, tag_id) SELECT ?, tag_id FROM game_tags WHERE game_id = ? ON CONFLICT DO NOTHING",
@@ -1064,7 +1069,17 @@ async def merge_games(request: Request, body: MergeBody):
 
             for table in ("game_tags", "game_genres", "store_availability", "user_game_prefs"):
                 conn.execute(f"DELETE FROM {table} WHERE game_id = ?", [discard])
+
+            # game_id is now NULL on all discard platform_games — safe to delete the games row
             conn.execute("DELETE FROM games WHERE id = ?", [discard])
+
+            # Re-point the discard platform_games to the surviving game
+            if discard_pg_ids:
+                placeholders = ",".join(["?"] * len(discard_pg_ids))
+                conn.execute(
+                    f"UPDATE platform_games SET game_id = ? WHERE id IN ({placeholders})",
+                    [survive] + discard_pg_ids,
+                )
 
             conn.execute("COMMIT")
         except Exception as exc:
