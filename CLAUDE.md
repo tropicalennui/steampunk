@@ -6,6 +6,37 @@
 - **Secrets must never appear in plain text in any committed file.** All secrets (API keys, tokens, credentials, connection strings) are stored in `gandalf.json` at the workspace root. That file is gitignored and must never be committed.
 - When referencing a secret in code or docs, use a placeholder name (e.g. `OPENAI_API_KEY`) and note that the value lives in `gandalf.json`.
 
+## Git Workflow
+
+**Never commit directly to `main`.** All work happens on a branch.
+
+### Branch naming
+| Prefix | Use for |
+|---|---|
+| `feature/` | New user-facing functionality |
+| `chore/` | Maintenance, refactoring, tooling, dependencies |
+| `bug/` | Bug fixes |
+| `docs/` | Documentation-only changes |
+
+Use `kebab-case` after the prefix. Delete branches after merging.
+
+### Commit messages
+```
+<type>(<scope>): <short summary>   ← imperative, lowercase, ≤72 chars
+```
+Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`. Add a body when the *why* isn't obvious. Never include secrets or PII in commit messages.
+
+### Merging to main
+1. Run `pysonar --sonar-host-url=http://localhost:9000 --sonar-token=<token> --sonar-project-key=Steampunk`
+2. Confirm zero open issues: `GET /api/issues/search?projectKeys=Steampunk&statuses=OPEN` → `total` must be `0`
+3. Only then: `git checkout main && git merge --no-ff <branch>` then `git push origin main`
+4. Delete the branch
+
+No PRs required (solo project). The SonarQube gate is the quality check.
+
+### Secrets in sonar-project.properties
+`sonar-project.properties` is gitignored — never commit it. The SonarQube token lives in `gandalf.json`.
+
 ## Feature Development Workflow
 
 Every workspace feature must go through this sequence before implementation:
