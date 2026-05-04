@@ -706,9 +706,9 @@ async def library(request: Request, show_hidden: bool = False):
         last_synced = _last_synced(conn)
         games = _query(conn, """
             SELECT
-                g.id                                                   AS game_id,
-                g.title,
-                g.cover_url,
+                cg.id                                                  AS game_id,
+                cg.title,
+                cg.cover_url,
                 list_distinct(list(pl.slug))                           AS platforms,
                 MAX(l.playtime_mins)                                   AS playtime_mins,
                 MAX(CASE WHEN pl.slug = 'steam'  THEN l.playtime_mins END) AS steam_playtime_mins,
@@ -722,19 +722,21 @@ async def library(request: Request, show_hidden: bool = False):
                 COALESCE(bool_or(sa.platform_id = 3 AND sa.available), FALSE) AS available_on_gog,
                 ugp.rating,
                 COALESCE(ugp.hidden, FALSE)                            AS hidden
-            FROM library l
-            JOIN platform_games pg ON pg.id = l.platform_game_id
-            JOIN games g            ON g.id  = pg.game_id
+            FROM games g
+            JOIN games cg           ON cg.id = COALESCE(g.merged_into, g.id)
+            JOIN platform_games pg  ON pg.game_id = g.id
             JOIN platforms pl       ON pl.id = pg.platform_id
+            JOIN library l          ON l.platform_game_id = pg.id
             LEFT JOIN achievements a   ON a.platform_game_id = pg.id
             LEFT JOIN wishlist w       ON w.platform_game_id = pg.id
-            LEFT JOIN game_genres gg   ON gg.game_id = g.id
+            LEFT JOIN game_genres gg   ON gg.game_id = cg.id
             LEFT JOIN genres gn        ON gn.id = gg.genre_id
-            LEFT JOIN store_availability sa ON sa.game_id = g.id
-            LEFT JOIN user_game_prefs ugp   ON ugp.game_id = g.id
+            LEFT JOIN store_availability sa ON sa.game_id = cg.id
+            LEFT JOIN user_game_prefs ugp   ON ugp.game_id = cg.id
             LEFT JOIN stg_psn_library spsn  ON spsn.np_communication_id = pg.external_id
-            WHERE (? OR NOT COALESCE(ugp.hidden, FALSE))
-            GROUP BY g.id, g.title, g.cover_url, ugp.rating, ugp.hidden
+            WHERE cg.merged_into IS NULL
+              AND (? OR NOT COALESCE(ugp.hidden, FALSE))
+            GROUP BY cg.id, cg.title, cg.cover_url, ugp.rating, ugp.hidden
             ORDER BY MAX(l.playtime_mins) DESC NULLS LAST
         """, [show_hidden])
 
@@ -1041,13 +1043,10 @@ async def merge_games(request: Request, body: MergeBody):
                 [final_title, final_cover, final_igdb, survive],
             )
 
-            # Save the discard platform_game IDs before touching game_id
-            discard_pg_ids = [
-                r["id"] for r in _query(conn, "SELECT id FROM platform_games WHERE game_id = ?", [discard])
-            ]
-            # Null out the FK so the games row can be deleted without a cascade-check violation
-            conn.execute("UPDATE platform_games SET game_id = NULL WHERE game_id = ?", [discard])
-
+                # Copy tags/genres/availability/prefs from discard → survive, then clear from discard.
+            # platform_games rows are NOT touched — DuckDB FK checks on that table's PK
+            # fire even on game_id updates, so we leave platform_games alone entirely.
+            # The library query follows merged_into to aggregate both games' platform data.
             conn.execute(
                 "INSERT INTO game_tags (game_id, tag_id) SELECT ?, tag_id FROM game_tags WHERE game_id = ? ON CONFLICT DO NOTHING",
                 [survive, discard],
@@ -1066,20 +1065,11 @@ async def merge_games(request: Request, body: MergeBody):
                 "SELECT ?, rating, hidden, updated_at FROM user_game_prefs WHERE game_id = ? ON CONFLICT DO NOTHING",
                 [survive, discard],
             )
-
             for table in ("game_tags", "game_genres", "store_availability", "user_game_prefs"):
                 conn.execute(f"DELETE FROM {table} WHERE game_id = ?", [discard])
 
-            # game_id is now NULL on all discard platform_games — safe to delete the games row
-            conn.execute("DELETE FROM games WHERE id = ?", [discard])
-
-            # Re-point the discard platform_games to the surviving game
-            if discard_pg_ids:
-                placeholders = ",".join(["?"] * len(discard_pg_ids))
-                conn.execute(
-                    f"UPDATE platform_games SET game_id = ? WHERE id IN ({placeholders})",
-                    [survive] + discard_pg_ids,
-                )
+            # Mark discard as merged — library query follows this to produce one card
+            conn.execute("UPDATE games SET merged_into = ? WHERE id = ?", [survive, discard])
 
             conn.execute("COMMIT")
         except Exception as exc:
