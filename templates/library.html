@@ -699,7 +699,11 @@
     btn.disabled = false;
     btn.textContent = 'Merge';
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(`Merge failed (${res.status}): ${err.error || 'unknown error'}`);
+      return;
+    }
     const { surviving_game_id } = await res.json();
 
     // Remove both cards; refresh the surviving card via re-fetch

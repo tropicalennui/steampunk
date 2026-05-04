@@ -1022,20 +1022,23 @@ async def merge_games(request: Request, body: MergeBody):
 
         chosen_title = (body.preferred_title or "").strip() or None
 
+        # Pre-fetch both rows before touching anything
+        rows = _query(conn, "SELECT id, title, cover_url, igdb_id FROM games WHERE id IN (?, ?)", [survive, discard])
+        if len(rows) < 2:
+            return JSONResponse({"error": f"one or both game IDs not found: {a}, {b}"}, status_code=404)
+        row_map = {r["id"]: r for r in rows}
+        sv, dc = row_map[survive], row_map[discard]
+
+        final_title  = chosen_title or sv["title"]
+        final_cover  = sv["cover_url"]  or dc["cover_url"]
+        final_igdb   = sv["igdb_id"]    or dc["igdb_id"]
+
         try:
             conn.execute("BEGIN")
 
-            # Fetch discard fields before any modifications
-            discard_row = _query(conn, "SELECT title, cover_url, igdb_id FROM games WHERE id = ?", [discard])
-            if not discard_row:
-                conn.execute("ROLLBACK")
-                return JSONResponse({"error": "game not found"}, status_code=404)
-            d = discard_row[0]
-
             conn.execute(
-                "UPDATE games SET title = ?, cover_url = COALESCE(cover_url, ?), igdb_id = COALESCE(igdb_id, ?) WHERE id = ?",
-                [chosen_title or _query(conn, "SELECT title FROM games WHERE id = ?", [survive])[0]["title"],
-                 d["cover_url"], d["igdb_id"], survive],
+                "UPDATE games SET title = ?, cover_url = ?, igdb_id = ? WHERE id = ?",
+                [final_title, final_cover, final_igdb, survive],
             )
 
             conn.execute("UPDATE platform_games SET game_id = ? WHERE game_id = ?", [survive, discard])
