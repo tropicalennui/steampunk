@@ -44,11 +44,14 @@ CREATE TABLE IF NOT EXISTS genres (
 CREATE SEQUENCE IF NOT EXISTS seq_games START 1;
 
 CREATE TABLE IF NOT EXISTS games (
-    id        INTEGER PRIMARY KEY DEFAULT nextval('seq_games'),
-    title     VARCHAR NOT NULL,
-    cover_url VARCHAR,
-    igdb_id   INTEGER             -- nullable, used for cross-platform dedup later
+    id          INTEGER PRIMARY KEY DEFAULT nextval('seq_games'),
+    title       VARCHAR NOT NULL,
+    cover_url   VARCHAR,
+    igdb_id     INTEGER,           -- nullable, used for cross-platform dedup later
+    merged_into INTEGER REFERENCES games(id)  -- set when this row is merged into another
 );
+
+ALTER TABLE games ADD COLUMN IF NOT EXISTS merged_into INTEGER;
 
 -- Platform-specific record for a game (one row per platform the game exists on)
 CREATE SEQUENCE IF NOT EXISTS seq_platform_games START 1;
