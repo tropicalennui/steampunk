@@ -34,8 +34,7 @@
           <button type="button" onclick="submitSync('all')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-t-md">All platforms</button>
           <button type="button" onclick="submitSync('steam')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Steam only</button>
           <button type="button" onclick="submitSync('gog')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">GOG only</button>
-          <button type="button" onclick="submitSync('psn')"    class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">PlayStation only</button>
-          <button type="button" onclick="submitSync('switch')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">Nintendo Switch only</button>
+          <button type="button" onclick="submitSync('psn')"    class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">PlayStation only</button>
         </div>
       </div>
     </form>
@@ -74,7 +73,6 @@
   <button onclick="setPlatformFilter('steam',  this)" class="filter-pill" data-filter="steam">Steam</button>
   <button onclick="setPlatformFilter('gog',    this)" class="filter-pill" data-filter="gog">GOG</button>
   <button onclick="setPlatformFilter('psn',    this)" class="filter-pill" data-filter="psn">PlayStation</button>
-  <button onclick="setPlatformFilter('switch', this)" class="filter-pill" data-filter="switch">Nintendo Switch</button>
   <button onclick="setPlatformFilter('multi',  this)" class="filter-pill" data-filter="multi">Multi-platform</button>
 </div>
 {% endif %}
@@ -156,7 +154,6 @@
         <span class="text-[9px] px-1.5 py-0.5 rounded font-medium
           {% if platform == 'steam' %}bg-blue-900/60 text-blue-300 border border-blue-800
           {% elif platform == 'gog' %}bg-purple-900/60 text-purple-300 border border-purple-800
-          {% elif platform == 'switch' %}bg-red-900/60 text-red-300 border border-red-800
           {% else %}bg-zinc-800 text-zinc-400 border border-zinc-700{% endif %}">
           {{ platform | upper }}
         </span>
@@ -169,9 +166,9 @@
       </div>
       {% endif %}
 
-      <!-- Playtime / never played — shown for Steam and Switch; suppressed for GOG/PSN-only -->
+      <!-- Playtime / never played — shown for Steam; suppressed for GOG/PSN-only -->
       <div class="flex items-center justify-between mt-1.5">
-        {% set has_playtime = 'steam' in (game.platforms or []) or 'switch' in (game.platforms or []) %}
+        {% set has_playtime = 'steam' in (game.platforms or []) %}
         {% if has_playtime %}
         <span class="text-xs text-zinc-500">
           {% if game.playtime_mins and game.playtime_mins > 0 %}
@@ -245,7 +242,6 @@
       if (activePlatformFilter === 'steam')  platformMatch = platforms.includes('steam');
       else if (activePlatformFilter === 'gog')    platformMatch = platforms.includes('gog');
       else if (activePlatformFilter === 'psn')    platformMatch = platforms.includes('psn');
-      else if (activePlatformFilter === 'switch') platformMatch = platforms.includes('switch');
       else if (activePlatformFilter === 'multi')  platformMatch = platforms.length > 1;
       const show = textMatch && platformMatch;
       card.style.display = show ? '' : 'none';

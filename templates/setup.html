@@ -384,116 +384,14 @@
   <!-- ------------------------------------------------------------------ -->
   <div id="panel-switch" class="tab-panel hidden">
 
-    <p class="text-zinc-400 text-sm mb-4">
-      Connect your Nintendo account to include your Switch play history in the unified library.
-      SteamPunk stores only a long-lived session token — your password is never seen or stored.
-    </p>
-    <div class="bg-zinc-800 border border-zinc-700 rounded-lg p-4 mb-6 text-sm">
-      <p class="text-zinc-300 font-medium mb-1">Prerequisite: Nintendo Switch Parental Controls app</p>
-      <p class="text-zinc-500">
-        Play history is read from Nintendo's Parental Controls API. Your Switch must be
-        linked to the <strong class="text-zinc-300">Nintendo Switch Parental Controls</strong>
-        app on your phone before syncing will return any data.
-        If you haven't done this yet, install the app, register your console, then come back here.
+    <div class="flex flex-col items-center justify-center py-16 text-center">
+      <p class="text-zinc-300 font-medium text-lg mb-2">Nintendo Switch</p>
+      <span class="text-xs px-3 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-500 font-medium tracking-wide uppercase mb-4">Coming Soon</span>
+      <p class="text-zinc-500 text-sm max-w-sm">
+        Nintendo Switch integration is planned but not yet available. Check back in a future update.
       </p>
     </div>
 
-    {% if error == 'switch_no_code' %}
-    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
-      Couldn't find a session token code in that URL. Make sure you copied the full URL
-      from your browser's address bar after the Nintendo login page redirected you.
-    </div>
-    {% elif error == 'switch_token_failed' %}
-    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
-      Token exchange with Nintendo failed. The code may have expired — try again from Step 1.
-    </div>
-    {% endif %}
-
-    {% if switch_auth_expired %}
-    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-6 text-sm text-amber-300">
-      Your Nintendo session has expired. Follow the steps below to reconnect.
-    </div>
-    {% endif %}
-
-    {% if switch_just_connected %}
-    <div class="bg-zinc-800 border border-green-700 rounded-lg p-4 mb-6 text-sm text-green-400">
-      Nintendo Switch connected successfully. Run a sync to import your library.
-    </div>
-    {% endif %}
-
-    {% if switch_connected and not switch_auth_expired %}
-    <!-- Connected state -->
-    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4">
-      <div class="flex items-center gap-3">
-        <span class="w-2 h-2 rounded-full bg-green-500"></span>
-        <span class="text-sm text-gray-200">Nintendo account connected</span>
-      </div>
-      <form method="POST" action="/auth/switch/disconnect">
-        <button
-          type="submit"
-          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
-        >
-          Disconnect
-        </button>
-      </form>
-    </div>
-    {% else %}
-    <div class="space-y-8">
-
-      <div class="flex gap-4">
-        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
-        <div>
-          <p class="text-gray-200 font-medium">Open the Nintendo login page and sign in</p>
-          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
-            You'll reach a <strong class="text-zinc-300">"Select this person"</strong> screen.
-            <strong class="text-zinc-300">Do not click that button.</strong>
-          </p>
-          <a
-            href="/auth/switch"
-            target="_blank"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-600 hover:border-amber-500 text-gray-200 hover:text-amber-400 font-medium text-sm rounded-lg transition"
-          >
-            Open Nintendo Login &nearr;
-          </a>
-        </div>
-      </div>
-
-      <div class="flex gap-4">
-        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
-        <div class="w-full">
-          <p class="text-gray-200 font-medium">Right-click "Select this person" and copy the link</p>
-          <p class="text-zinc-500 text-sm mt-0.5 mb-3">
-            <strong class="text-zinc-300">Right-click</strong> (or long-press) the
-            <strong class="text-zinc-300">"Select this person"</strong> button and choose
-            <strong class="text-zinc-300">Copy link address</strong>.
-            The URL starts with <code class="text-zinc-400">npf54789befb391a838://auth#</code>.
-            Paste it below.
-          </p>
-          <form method="POST" action="/auth/switch/connect">
-            <input
-              type="text"
-              name="redirect_url"
-              placeholder="npf54789befb391a838://auth#session_state=...&amp;session_token_code=..."
-              required
-              class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-zinc-600 focus:outline-none focus:border-amber-600 font-mono"
-            />
-            <div class="flex items-center justify-between mt-3">
-              <p class="text-zinc-600 text-xs">
-                Stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
-              </p>
-              <button
-                type="submit"
-                class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
-              >
-                Connect
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-    </div>
-    {% endif %}
   </div>
 
 </div>
