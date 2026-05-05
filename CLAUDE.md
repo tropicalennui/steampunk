@@ -41,10 +41,19 @@ Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`. Add a body when the *
    (Invoke-RestMethod "http://localhost:9000/api/issues/search?projectKeys=Steampunk&statuses=OPEN&ps=1" -Headers $h).total
    ```
    Must return `0`. If not, fix all issues on the branch and re-scan.
-4. Only then: `git checkout main && git merge --no-ff <branch>` then `git push origin main`
-5. Delete the branch
+4. Push the branch to GitHub and open a PR targeting `main`.
+5. Merge the PR on GitHub (squash or merge commit — your choice). Delete the branch after merging.
 
-No PRs required (solo project). The SonarQube gate is the quality check.
+The SonarQube gate is the quality check before opening the PR.
+
+### Release notes (release-please)
+A GitHub Action ([`.github/workflows/release-please.yml`](.github/workflows/release-please.yml)) watches `main` for conventional commits and automatically opens a **Release PR** that bumps the version and updates `CHANGELOG.md`. Merging that PR creates a GitHub Release.
+
+- `feat` commits → minor version bump, appear under **Features** in the changelog
+- `fix` commits → patch bump, appear under **Bug Fixes**
+- `refactor` commits → patch bump, appear under **Refactoring**
+- `chore` / `docs` commits → patch bump, hidden from the public changelog
+- `feat!` or `fix!` (breaking change) → major version bump
 
 ### Secrets in sonar-project.properties
 `sonar-project.properties` is gitignored — never commit it. The SonarQube token lives in `gandalf.json` under key `sonarqube.token`.
