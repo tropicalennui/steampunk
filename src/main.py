@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -25,6 +26,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from auth import fetch_profile, get_auth_url, verify_callback
 from db import DB_PATH, SECRETS_PATH, init_db, load_secrets, save_secrets
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = ROOT / "templates"
@@ -1080,7 +1083,8 @@ async def merge_games(request: Request, body: MergeBody):
             conn.execute("COMMIT")
         except Exception as exc:
             conn.execute("ROLLBACK")
-            return JSONResponse({"error": str(exc)}, status_code=500)
+            logger.exception("merge_games failed: survive=%s discard=%s", survive, discard)
+            return JSONResponse({"error": "merge failed"}, status_code=500)
 
     return JSONResponse({"surviving_game_id": survive})
 
