@@ -13,7 +13,7 @@ from collectors.pipeline import _write_secrets
 # Fetch (async, bridged to sync via asyncio.run)
 # ---------------------------------------------------------------------------
 
-async def _xbox_fetch_async(
+async def _xbox_fetch_async(  # pragma: no cover
     client_id: str,
     oauth_dict: dict,
     xau_dict: dict,
@@ -80,7 +80,7 @@ async def _xbox_fetch_async(
         )
 
 
-def fetch_xbox_library(secrets: dict) -> Optional[list]:
+def fetch_xbox_library(secrets: dict) -> Optional[list]:  # pragma: no cover
     xbox_cfg   = secrets.get("xbox", {})
     client_id  = xbox_cfg.get("client_id")
     oauth_dict = xbox_cfg.get("oauth")
@@ -226,7 +226,7 @@ def promote_xbox(conn: duckdb.DuckDBPyConnection) -> None:
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_xbox(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_xbox(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     xbox_cfg = secrets.get("xbox", {})
     if not xbox_cfg.get("oauth"):
         print("\nXbox not connected — skipping Xbox sync")

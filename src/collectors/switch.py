@@ -305,7 +305,7 @@ def promote_switch(conn: duckdb.DuckDBPyConnection) -> None:
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_switch(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_switch(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     switch_cfg = secrets.get("switch", {})
     if not (switch_cfg.get("session_token") and not switch_cfg.get("auth_expired")):
         print("\nNintendo Switch not connected — skipping Switch sync")

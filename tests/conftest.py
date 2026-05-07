@@ -94,6 +94,17 @@ def db_conn():
 
 
 @pytest.fixture
+def unauth_client(monkeypatch):
+    """TestClient where _user returns None (not logged in)."""
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(_main_module, "_user", lambda req: None)
+    monkeypatch.setattr(_main_module, "_run_sync", lambda platforms=None: None)
+    with TestClient(_main_module.app, raise_server_exceptions=True) as c:
+        yield c
+
+
+@pytest.fixture
 def client(monkeypatch):
     """FastAPI TestClient with a fake authenticated session and a no-op _run_sync."""
     from fastapi.testclient import TestClient

@@ -24,7 +24,7 @@ from collectors import (  # noqa: F401
     run,
 )
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(

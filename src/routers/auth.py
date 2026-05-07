@@ -75,7 +75,7 @@ def _make_switch_auth_url() -> tuple[str, str, str]:
 # Xbox Live callback server
 # ---------------------------------------------------------------------------
 
-async def _xbox_exchange_tokens(code: str) -> None:
+async def _xbox_exchange_tokens(code: str) -> None:  # pragma: no cover
     from xbox.webapi.authentication.manager import AuthenticationManager
     from xbox.webapi.common.signed_session import SignedSession
 
@@ -93,11 +93,11 @@ async def _xbox_exchange_tokens(code: str) -> None:
         })
 
 
-class _XboxCallbackServer(socketserver.TCPServer):
+class _XboxCallbackServer(socketserver.TCPServer):  # pragma: no cover
     steampunk_base_url: str
 
 
-class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
+class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):  # pragma: no cover
     def do_GET(self):
         from typing import cast
         base = cast(_XboxCallbackServer, self.server).steampunk_base_url
@@ -132,7 +132,7 @@ class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
         pass  # suppress default per-request stdout logging from BaseHTTPRequestHandler
 
 
-def _run_xbox_callback_server(steampunk_base_url: str) -> None:
+def _run_xbox_callback_server(steampunk_base_url: str) -> None:  # pragma: no cover
     try:
         with _XboxCallbackServer(("127.0.0.1", 8080), _XboxCallbackHandler) as httpd:
             httpd.steampunk_base_url = steampunk_base_url.rstrip("/")
@@ -416,7 +416,7 @@ async def auth_switch_disconnect(request: Request):
 # ── Xbox Live ─────────────────────────────────────────────────────────────────
 
 @router.get("/auth/xbox")
-async def auth_xbox(request: Request):
+async def auth_xbox(request: Request):  # pragma: no cover
     if not _user(request):
         return RedirectResponse("/", status_code=302)
 

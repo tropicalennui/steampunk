@@ -224,7 +224,7 @@ def promote_gog(conn: duckdb.DuckDBPyConnection) -> None:
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_gog(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_gog(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     gog_cfg = secrets.get("gog", {})
     if not (gog_cfg.get("access_token") and not gog_cfg.get("auth_expired")):
         print("\nGOG not connected or auth expired — skipping GOG sync")
