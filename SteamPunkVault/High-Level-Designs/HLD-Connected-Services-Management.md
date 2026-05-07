@@ -156,7 +156,7 @@ Because disabling always scrubs data (§4a), there is nothing to filter. The rel
 
 **Preference agent:** `profile.json` is rebuilt on each sync run. A disabled platform's data is gone until re-enabled and re-synced.
 
-### 7. `collect.py` Integration
+### 7. Pipeline Integration
 
 Before each platform's sync block, `collect.py` reads `{platform}.enabled` from `gandalf.json` (defaulting per §1 rules if absent). If `enabled = false`, that platform's sync is skipped with a log line:
 
