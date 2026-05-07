@@ -1,9 +1,11 @@
 import asyncio
 import base64
 import hashlib
+import http.server
 import json
 import logging
 import os
+import socketserver
 import subprocess
 import sys
 import threading
@@ -702,6 +704,104 @@ async def auth_switch_disconnect(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Auth routes — Xbox Live
+# ---------------------------------------------------------------------------
+
+_XBOX_CLIENT_ID = "388ea51c-0b25-4029-aae2-17df49d23905"
+_XBOX_REDIRECT_URI = "http://localhost:8080/auth/callback"
+
+
+async def _xbox_exchange_tokens(code: str) -> None:
+    from xbox.webapi.authentication.manager import AuthenticationManager
+    from xbox.webapi.common.signed_session import SignedSession
+
+    async with SignedSession() as session:
+        auth_mgr = AuthenticationManager(session, _XBOX_CLIENT_ID, "", _XBOX_REDIRECT_URI)
+        await auth_mgr.request_tokens(code)
+        save_secrets({
+            "xbox": {
+                "client_id": _XBOX_CLIENT_ID,
+                "oauth": auth_mgr.oauth.model_dump(mode="json"),
+                "user_token": auth_mgr.user_token.model_dump(mode="json"),
+                "xsts_token": auth_mgr.xsts_token.model_dump(mode="json"),
+                "auth_expired": False,
+            }
+        })
+
+
+class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        base = self.server.steampunk_base_url
+
+        try:
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            code = params.get("code", [None])[0]
+        except Exception:
+            code = None
+
+        if code:
+            try:
+                asyncio.run(_xbox_exchange_tokens(code))
+                redirect_url = f"{base}/setup?xbox_connected=1"
+            except Exception as exc:
+                logger.error("Xbox token exchange failed: %s", exc)
+                redirect_url = f"{base}/setup?error=xbox_token_failed"
+        else:
+            error = params.get("error_description", params.get("error", ["unknown"]))[0]
+            logger.error("Xbox auth callback had no code: %s", error)
+            redirect_url = f"{base}/setup?error=xbox_auth_failed"
+
+        body = f'<html><head><meta http-equiv="refresh" content="0;url={redirect_url}"></head></html>'.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass  # suppress default per-request stdout logging from BaseHTTPRequestHandler
+
+
+def _run_xbox_callback_server(steampunk_base_url: str) -> None:
+    try:
+        with socketserver.TCPServer(("127.0.0.1", 8080), _XboxCallbackHandler) as httpd:
+            httpd.steampunk_base_url = steampunk_base_url.rstrip("/")
+            httpd.timeout = 300
+            httpd.handle_request()
+    except OSError as exc:
+        logger.error("Xbox callback server could not start on port 8080: %s", exc)
+
+
+@app.get("/auth/xbox")
+async def auth_xbox(request: Request):
+    if not _user(request):
+        return RedirectResponse("/", status_code=302)
+
+    from xbox.webapi.authentication.manager import AuthenticationManager
+    from xbox.webapi.common.signed_session import SignedSession
+
+    async with SignedSession() as session:
+        auth_mgr = AuthenticationManager(session, _XBOX_CLIENT_ID, "", _XBOX_REDIRECT_URI)
+        auth_url = auth_mgr.generate_authorization_url()
+
+    base_url = str(request.base_url)
+    threading.Thread(target=_run_xbox_callback_server, args=(base_url,), daemon=True).start()
+    return RedirectResponse(auth_url, status_code=302)
+
+
+@app.post("/auth/xbox/disconnect")
+async def auth_xbox_disconnect(request: Request):
+    if not _user(request):
+        return RedirectResponse("/", status_code=302)
+
+    save_secrets({"xbox": {
+        "client_id": None, "oauth": None,
+        "user_token": None, "xsts_token": None, "auth_expired": False,
+    }})
+    return RedirectResponse(_URL_SETUP, status_code=302)
+
+
+# ---------------------------------------------------------------------------
 # App routes
 # ---------------------------------------------------------------------------
 
@@ -805,6 +905,7 @@ async def setup_page(
     gog_connected: str = "",
     psn_connected: str = "",
     switch_connected: str = "",
+    xbox_connected: str = "",
 ):
     user = _user(request)
     if not user:
@@ -814,6 +915,7 @@ async def setup_page(
     gog = fresh.get("gog", {})
     psn = fresh.get("psn", {})
     sw = fresh.get("switch", {})
+    xb = fresh.get("xbox", {})
 
     return templates.TemplateResponse(request, "setup.html", {
         "user": user,
@@ -829,6 +931,9 @@ async def setup_page(
         "switch_connected": bool(sw.get("session_token") and not sw.get("auth_expired")),
         "switch_auth_expired": bool(sw.get("auth_expired")),
         "switch_just_connected": bool(switch_connected),
+        "xbox_connected": bool(xb.get("oauth") and not xb.get("auth_expired")),
+        "xbox_auth_expired": bool(xb.get("auth_expired")),
+        "xbox_just_connected": bool(xbox_connected),
     })
 
 
@@ -1081,7 +1186,7 @@ async def merge_games(request: Request, body: MergeBody):
             conn.execute("UPDATE games SET merged_into = ? WHERE id = ?", [survive, discard])
 
             conn.execute("COMMIT")
-        except Exception as exc:
+        except Exception:
             conn.execute("ROLLBACK")
             logger.exception("merge_games failed: survive=%s discard=%s", survive, discard)
             return JSONResponse({"error": "merge failed"}, status_code=500)

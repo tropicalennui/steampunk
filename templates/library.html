@@ -32,9 +32,10 @@
         >&#9660;</button>
         <div id="sync-dropdown" class="hidden absolute top-full right-0 mt-1 w-36 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50">
           <button type="button" onclick="submitSync('all')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-t-md">All platforms</button>
-          <button type="button" onclick="submitSync('steam')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Steam only</button>
-          <button type="button" onclick="submitSync('gog')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">GOG only</button>
-          <button type="button" onclick="submitSync('psn')"    class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">PlayStation only</button>
+          <button type="button" onclick="submitSync('steam')" class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Steam</button>
+          <button type="button" onclick="submitSync('gog')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">GOG</button>
+          <button type="button" onclick="submitSync('psn')"   class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">PlayStation</button>
+          <button type="button" onclick="submitSync('xbox')"  class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">Xbox</button>
         </div>
       </div>
     </form>
@@ -91,6 +92,7 @@
   <button onclick="setPlatformFilter('steam', this)" class="filter-pill" data-filter="steam">Steam</button>
   <button onclick="setPlatformFilter('gog',   this)" class="filter-pill" data-filter="gog">GOG</button>
   <button onclick="setPlatformFilter('psn',   this)" class="filter-pill" data-filter="psn">PlayStation</button>
+  <button onclick="setPlatformFilter('xbox',  this)" class="filter-pill" data-filter="xbox">Xbox</button>
 </div>
 {% endif %}
 
@@ -160,6 +162,8 @@
         {% set badge_cls %}text-[9px] px-1.5 py-0.5 rounded font-medium border transition
           {%- if platform == 'steam' %} bg-blue-900/60 text-blue-300 border-blue-800
           {%- elif platform == 'gog' %} bg-purple-900/60 text-purple-300 border-purple-800
+          {%- elif platform == 'psn' %} bg-indigo-900/60 text-indigo-300 border-indigo-800
+          {%- elif platform == 'xbox' %} bg-green-900/60 text-green-300 border-green-800
           {%- else %} bg-zinc-800 text-zinc-400 border-zinc-700{%- endif %}
           {%- if multi and platform == default_plat %} ring-1 ring-amber-500{%- endif %}{% endset %}
         {% if multi %}
@@ -559,6 +563,7 @@
       if (activePlatformFilter === 'steam') platformMatch = platforms.includes('steam');
       else if (activePlatformFilter === 'gog')   platformMatch = platforms.includes('gog');
       else if (activePlatformFilter === 'psn')   platformMatch = platforms.includes('psn');
+      else if (activePlatformFilter === 'xbox')  platformMatch = platforms.includes('xbox');
       const show = textMatch && platformMatch;
       card.style.display = show ? '' : 'none';
       if (show) visible++;
