@@ -187,7 +187,8 @@ SteamPunk/
 │   ├── library.json
 │   └── profile.json
 ├── src/
-│   ├── collect.py        # data pipeline
+│   ├── collect.py        # data pipeline entry point (shim → collectors/)
+│   ├── collectors/       # per-platform pipeline modules
 │   ├── profile.py        # profile builder
 │   └── agent.py          # Claude agent + tools
 └── SteamPunkVault/

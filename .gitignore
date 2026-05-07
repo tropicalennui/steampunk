@@ -61,6 +61,8 @@ __pycache__/
 dist/
 build/
 .cache/
+.coverage
+coverage.xml
 
 # ─── Obsidian vault ───────────────────────────────────
 SteamPunkVault/.obsidian

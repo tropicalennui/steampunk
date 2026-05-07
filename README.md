@@ -1,10 +1,10 @@
 # SteamPunk
 
-A personal gaming library aggregator and AI recommendation engine. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, and Nintendo Switch into a single normalized database, then (in future versions) uses Claude AI to surface personalized recommendations based on your actual play history.
+A personal gaming library aggregator and AI recommendation engine. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, and Xbox Live into a single normalized database, then (in future versions) uses Claude AI to surface personalized recommendations based on your actual play history.
 
 ## Features
 
-- **Unified library** — games from Steam, GOG, PSN, and Nintendo Switch in one place
+- **Unified library** — games from Steam, GOG, PSN, and Xbox Live in one place
 - **Preference profile** — automatically derived from playtime, genres, tags, achievements, and ratings
 - **AI agent** — conversational game recommendations via Claude, with filtering by price, genre, platform, and more
 - **Sync pipeline** — refresh any or all platforms on demand; inspect detailed logs
@@ -45,7 +45,7 @@ Create `gandalf.json` in the project root with your credentials:
 }
 ```
 
-Additional platform credentials (GOG OAuth tokens, PSN NPSSO, Nintendo Switch auth) are stored in the same file after you authenticate through the app's setup wizard.
+Additional platform credentials (GOG OAuth tokens, PSN NPSSO, Xbox Live auth) are stored in the same file after you authenticate through the app's setup wizard.
 
 > **Security note:** `gandalf.json` is gitignored and must never be committed.
 
@@ -64,7 +64,7 @@ The app starts at `http://localhost:8000`. Open it in a browser and follow the f
 | Steam | API key + session cookie |
 | GOG | OAuth 2.0 |
 | PlayStation Network | NPSSO token |
-| Nintendo Switch | Account auth flow |
+| Xbox Live | Account auth flow |
 
 Instructions for obtaining each credential are in the in-app setup wizard and the [User Guides](SteamPunkVault/User-Guides/).
 
