@@ -759,7 +759,7 @@ class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        pass
+        pass  # suppress default per-request stdout logging from BaseHTTPRequestHandler
 
 
 def _run_xbox_callback_server(steampunk_base_url: str) -> None:
@@ -1186,7 +1186,7 @@ async def merge_games(request: Request, body: MergeBody):
             conn.execute("UPDATE games SET merged_into = ? WHERE id = ?", [survive, discard])
 
             conn.execute("COMMIT")
-        except Exception as exc:
+        except Exception:
             conn.execute("ROLLBACK")
             logger.exception("merge_games failed: survive=%s discard=%s", survive, discard)
             return JSONResponse({"error": "merge failed"}, status_code=500)
