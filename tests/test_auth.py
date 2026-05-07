@@ -8,6 +8,7 @@ real browser redirect.  Everything else is covered here.
 import json
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -312,7 +313,8 @@ def test_auth_switch_unauthenticated_redirects_to_root(unauth_client):
 def test_auth_switch_redirects_to_nintendo(client):
     response = client.get("/auth/switch", follow_redirects=False)
     assert response.status_code == 302
-    assert "accounts.nintendo.com" in response.headers["location"]
+    parsed = urlparse(response.headers["location"])
+    assert parsed.hostname == "accounts.nintendo.com"
 
 
 def test_auth_switch_connect_no_code_redirects_to_error(client):
