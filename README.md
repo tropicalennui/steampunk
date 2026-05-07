@@ -1,14 +1,19 @@
 # SteamPunk
 
-A personal gaming library aggregator and AI recommendation engine. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, and Xbox Live into a single normalized database, then (in future versions) uses Claude AI to surface personalized recommendations based on your actual play history.
+A personal gaming library aggregator. SteamPunk pulls your game libraries from Steam, GOG, PlayStation Network, Nintendo Switch, and Xbox Live into a single normalized database.
 
 ## Features
 
-- **Unified library** — games from Steam, GOG, PSN, and Xbox Live in one place
-- **Preference profile** — automatically derived from playtime, genres, tags, achievements, and ratings
-- **AI agent** — conversational game recommendations via Claude, with filtering by price, genre, platform, and more
+- **Unified library** — games from Steam, GOG, PSN, Nintendo Switch, and Xbox Live in one place
 - **Sync pipeline** — refresh any or all platforms on demand; inspect detailed logs
 - **Setup wizard** — guided first-run flow to connect each platform
+- **Achievement & trophy tracking** — completion percentages and gamerscore across platforms
+- **Store availability** — flags games you own on one platform that are also available on another
+
+## Planned
+
+- **Preference profile** — automatically derived from playtime, genres, tags, achievements, and ratings
+- **AI agent** — conversational game recommendations via Claude
 
 ## Tech Stack
 
@@ -22,7 +27,7 @@ A personal gaming library aggregator and AI recommendation engine. SteamPunk pul
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - API credentials for any platforms you want to connect (see [Setup](#setup))
 
 ## Installation
@@ -35,17 +40,18 @@ pip install -r requirements.txt
 
 ## Setup
 
-Create `gandalf.json` in the project root with your credentials:
+The first-run setup wizard will prompt for your Steam API key and walk you through connecting any other platforms. Credentials are stored in `gandalf.json` at the project root (gitignored).
+
+If you need to pre-populate `gandalf.json` manually, the minimum required structure is:
 
 ```json
 {
-  "SESSION_SECRET": "<random-secret>",
-  "STEAM_API_KEY": "<your-steam-api-key>",
-  "ANTHROPIC_API_KEY": "<your-anthropic-api-key>"
+  "app": { "session_secret": "<random-string>" },
+  "steam": { "api_key": "<your-steam-api-key>" }
 }
 ```
 
-Additional platform credentials (GOG OAuth tokens, PSN NPSSO, Xbox Live auth) are stored in the same file after you authenticate through the app's setup wizard.
+Additional platform credentials (GOG OAuth tokens, PSN NPSSO, Nintendo Switch session token, Xbox Live auth) are added automatically when you authenticate through the setup wizard.
 
 > **Security note:** `gandalf.json` is gitignored and must never be committed.
 
@@ -64,7 +70,8 @@ The app starts at `http://localhost:8000`. Open it in a browser and follow the f
 | Steam | API key + session cookie |
 | GOG | OAuth 2.0 |
 | PlayStation Network | NPSSO token |
-| Xbox Live | Account auth flow |
+| Nintendo Switch | Session token (PKCE flow) |
+| Xbox Live | OAuth 2.0 |
 
 Instructions for obtaining each credential are in the in-app setup wizard and the [User Guides](SteamPunkVault/User-Guides/).
 
@@ -72,14 +79,25 @@ Instructions for obtaining each credential are in the in-app setup wizard and th
 
 ```
 src/
-  main.py       # FastAPI app and all HTTP endpoints
-  collect.py    # Data pipeline (fetches and normalizes games from all platforms)
-  schema.sql    # DuckDB schema
-  auth.py       # OAuth/session helpers
-  db.py         # Database initialization
-  init.py       # Startup / secrets loading
-SteamPunkVault/ # Obsidian knowledge base (stories, designs, guides)
-run.py          # Entry point
+  main.py           # FastAPI app factory + shared state
+  shared.py         # secrets, templates, DB helpers
+  auth.py           # Steam OpenID helpers
+  db.py             # DuckDB connection + secrets I/O
+  init.py           # First-run secrets initialisation
+  schema.sql        # DuckDB schema
+  collect.py        # Pipeline entry point (CLI shim)
+  collectors/       # Per-platform data pipeline
+    steam.py, gog.py, psn.py, switch.py, xbox.py
+    igdb.py         # IGDB matching + store availability
+    pipeline.py     # Shared constants + merge helpers
+  routers/          # FastAPI route handlers
+    auth.py         # All /auth/* routes
+    library.py      # Library view, API, merge
+    sync.py         # Sync trigger + log viewer
+    setup.py        # Setup page + wizard
+SteamPunkVault/     # Obsidian knowledge base (designs, guides)
+tests/              # pytest suite
+run.py              # Entry point
 ```
 
 ## License
