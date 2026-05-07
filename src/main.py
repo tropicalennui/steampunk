@@ -729,10 +729,16 @@ async def _xbox_exchange_tokens(code: str) -> None:
         })
 
 
+class _XboxCallbackServer(socketserver.TCPServer):
+    steampunk_base_url: str
+
+
 class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        base = self.server.steampunk_base_url
+        from typing import cast
+        base = cast(_XboxCallbackServer, self.server).steampunk_base_url
 
+        params: dict = {}
         try:
             params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             code = params.get("code", [None])[0]
@@ -764,7 +770,7 @@ class _XboxCallbackHandler(http.server.BaseHTTPRequestHandler):
 
 def _run_xbox_callback_server(steampunk_base_url: str) -> None:
     try:
-        with socketserver.TCPServer(("127.0.0.1", 8080), _XboxCallbackHandler) as httpd:
+        with _XboxCallbackServer(("127.0.0.1", 8080), _XboxCallbackHandler) as httpd:
             httpd.steampunk_base_url = steampunk_base_url.rstrip("/")
             httpd.timeout = 300
             httpd.handle_request()
