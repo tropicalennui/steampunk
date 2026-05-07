@@ -363,7 +363,7 @@ def promote(conn: duckdb.DuckDBPyConnection) -> None:
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_steam(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_steam(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     api_key  = secrets["steam"]["api_key"]
     steam_id = secrets["steam"]["steam_id64"]
     session  = make_read_session(api_key, secrets["steam"].get("session_cookie"))

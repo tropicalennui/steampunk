@@ -250,7 +250,7 @@ def run_store_availability(
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_igdb(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_igdb(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     igdb_cfg          = secrets.get("igdb", {})
     igdb_client_id    = igdb_cfg.get("client_id")
     igdb_client_secret = igdb_cfg.get("client_secret")

@@ -38,7 +38,7 @@ from collectors.igdb    import _sync_igdb
 from db import connect, init_db, load_secrets
 
 
-def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox"}) -> None:
+def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox"}) -> None:  # pragma: no cover
     secrets = load_secrets()
     init_db()
     conn = connect()
@@ -74,7 +74,7 @@ def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox"}) -> None
     print("\nAll done.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(

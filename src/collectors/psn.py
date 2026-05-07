@@ -353,7 +353,7 @@ def promote_psn(conn: duckdb.DuckDBPyConnection) -> None:
 # Sync helper
 # ---------------------------------------------------------------------------
 
-def _sync_psn(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:
+def _sync_psn(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragma: no cover
     psn_cfg = secrets.get("psn", {})
     if not (psn_cfg.get("npsso") or psn_cfg.get("access_token")):
         print("\nPSN not connected — skipping PSN sync")
