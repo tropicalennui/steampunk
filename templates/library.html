@@ -118,12 +118,13 @@
 <div id="game-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
   {% for game in games %}
   <div
-    class="game-card bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition group relative {% if game.hidden %}opacity-40 border-dashed{% elif game.never_launched %}opacity-50{% endif %}"
+    class="game-card bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden hover:border-zinc-600 transition group relative cursor-pointer {% if game.hidden %}opacity-40 border-dashed{% elif game.never_launched %}opacity-50{% endif %}"
     data-title="{{ game.title | lower }}"
     data-genres="{{ game.genres | join(' ') | lower }}"
     data-platforms="{{ game.platforms | join(' ') | lower }}"
     data-game-id="{{ game.game_id }}"
     data-game-title="{{ game.title }}"
+    onclick="navigateToDetail(event, {{ game.game_id }})"
   >
     {% if game.cover_url %}
     <img src="{{ game.cover_url }}" alt="" class="w-full object-cover aspect-video" loading="lazy" />
@@ -272,6 +273,12 @@
 </div>
 
 <script>
+  // ── Card navigation ──────────────────────────────────────────────────────────
+  function navigateToDetail(event, gameId) {
+    if (event.target.closest('button') || event.target.closest('[draggable]') === event.currentTarget) return;
+    window.location.href = `/library/games/${gameId}`;
+  }
+
   // ── State ────────────────────────────────────────────────────────────────────
   let activePlatformFilter = 'all';
   let viewMode = localStorage.getItem('libraryViewMode') || 'grid';

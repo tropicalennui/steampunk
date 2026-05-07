@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} — SteamPunk{% endblock %}
+
+{% block content %}
+
+<div class="mb-5">
+  <a href="/library" class="text-zinc-500 text-sm hover:text-amber-400 transition">← Library</a>
+</div>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<div class="flex gap-6 mb-8">
+
+  <div class="flex-shrink-0 w-52">
+    {% if game.cover_url %}
+    <img src="{{ game.cover_url }}" alt="" class="w-full rounded-lg object-cover aspect-video" />
+    {% else %}
+    <div class="w-full aspect-video bg-zinc-800 rounded-lg flex items-center justify-center">
+      <span class="text-zinc-600 text-xs">No image</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="flex-1 min-w-0">
+    <h1 class="text-2xl font-bold text-gray-100 mb-3 leading-tight">{{ game.title }}</h1>
+
+    <!-- Platform badges -->
+    <div class="flex flex-wrap gap-2 mb-3">
+      {% for slug in platform_slugs %}
+      <span class="text-xs px-2 py-1 rounded font-medium border
+        {% if slug == 'steam' %}bg-blue-900/60 text-blue-300 border-blue-800
+        {% elif slug == 'gog' %}bg-purple-900/60 text-purple-300 border-purple-800
+        {% else %}bg-zinc-800 text-zinc-400 border-zinc-700{% endif %}">
+        {{ slug | upper }}
+      </span>
+      {% endfor %}
+    </div>
+
+    <!-- Store availability -->
+    {% if availability.get(1) or availability.get(3) %}
+    <div class="flex flex-wrap gap-2 mb-4">
+      {% if availability.get(1) %}<span class="text-xs px-2 py-1 rounded bg-blue-950 text-blue-400 border border-blue-900">On Steam</span>{% endif %}
+      {% if availability.get(3) %}<span class="text-xs px-2 py-1 rounded bg-purple-950 text-purple-400 border border-purple-900">On GOG</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Rating + hide -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <button id="btn-up" onclick="detailSetRating('up')"
+        class="px-3 py-1.5 rounded text-sm border transition flex items-center gap-1.5
+               {% if prefs.rating == 'up' %}bg-green-600 border-green-600 text-white{% else %}bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-green-400 hover:border-green-700{% endif %}">
+        &#128077; Liked
+      </button>
+      <button id="btn-down" onclick="detailSetRating('down')"
+        class="px-3 py-1.5 rounded text-sm border transition flex items-center gap-1.5
+               {% if prefs.rating == 'down' %}bg-red-700 border-red-700 text-white{% else %}bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-700{% endif %}">
+        &#128078; Disliked
+      </button>
+      <button id="btn-hide" onclick="detailToggleHidden()"
+        class="px-3 py-1.5 rounded text-sm border transition
+               {% if prefs.hidden %}bg-zinc-700 border-zinc-500 text-zinc-200{% else %}bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500{% endif %}">
+        {% if prefs.hidden %}Show in library{% else %}Hide from library{% endif %}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Platform tabs ──────────────────────────────────────────────────────── -->
+{% if platform_slugs %}
+<div class="mb-8">
+  <div class="flex gap-0 border-b border-zinc-800 mb-6">
+    {% for slug in platform_slugs %}
+    <button id="tab-{{ slug }}" onclick="setTab('{{ slug }}')"
+      class="tab-btn px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition
+             {% if slug == default_tab %}text-amber-400 border-amber-500{% else %}text-zinc-500 border-transparent hover:text-zinc-300 hover:border-zinc-600{% endif %}">
+      {{ slug | upper }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Steam -->
+  {% if 'steam' in platform_data %}
+  {% set s = platform_data['steam'] %}
+  <div id="panel-steam" class="tab-panel {% if default_tab != 'steam' %}hidden{% endif %}">
+    <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
+
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Playtime</dt>
+        <dd class="text-sm text-zinc-200">
+          {% if s.playtime_mins and s.playtime_mins > 0 %}{{ (s.playtime_mins / 60) | round(1) }} hours{% else %}Never played{% endif %}
+        </dd>
+      </div>
+
+      {% if s.last_played_at %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Last played</dt>
+        <dd class="text-sm text-zinc-200"><span data-utc="{{ s.last_played_at }}">{{ s.last_played_at }}</span></dd>
+      </div>
+      {% endif %}
+
+      {% if s.first_played_at %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">First played</dt>
+        <dd class="text-sm text-zinc-200"><span data-utc="{{ s.first_played_at }}">{{ s.first_played_at }}</span></dd>
+      </div>
+      {% endif %}
+
+      {% if s.total_count and s.total_count > 0 %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Achievements</dt>
+        <dd class="text-sm text-zinc-200">{{ s.unlocked_count }} / {{ s.total_count }}
+          <span class="text-amber-600 ml-1">{{ s.achievement_pct | round(0) | int }}%</span>
+        </dd>
+      </div>
+      {% endif %}
+
+      {% if steam_detail.release_date %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Release date</dt>
+        <dd class="text-sm text-zinc-200">{{ steam_detail.release_date }}</dd>
+      </div>
+      {% endif %}
+
+      {% if s.purchased_at %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Purchased</dt>
+        <dd class="text-sm text-zinc-200">{{ s.purchased_at }}</dd>
+      </div>
+      {% endif %}
+
+    </dl>
+
+    {% if steam_detail.categories %}
+    <div class="mt-5">
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Categories</p>
+      <div class="flex flex-wrap gap-1.5">
+        {% for cat in steam_detail.categories %}
+        <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">{{ cat }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if s.review_text %}
+    <div class="mt-5">
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">My review</p>
+      <p class="text-sm text-zinc-300 leading-relaxed">{{ s.review_text }}</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- PSN -->
+  {% if 'psn' in platform_data %}
+  {% set p = platform_data['psn'] %}
+  <div id="panel-psn" class="tab-panel {% if default_tab != 'psn' %}hidden{% endif %}">
+    <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
+
+      {% if psn_detail.trophy_progress is not none %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Trophy progress</dt>
+        <dd class="text-sm text-zinc-200">
+          {% if psn_detail.trophies_defined and psn_detail.trophies_defined > 0 %}
+            {{ psn_detail.trophies_earned }} / {{ psn_detail.trophies_defined }}
+            <span class="text-amber-600 ml-1">{{ psn_detail.trophy_progress }}%</span>
+          {% else %}
+            {{ psn_detail.trophy_progress }}%
+          {% endif %}
+        </dd>
+      </div>
+      {% endif %}
+
+      {% if psn_detail.platform %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Platform</dt>
+        <dd class="text-sm text-zinc-200">{{ psn_detail.platform }}</dd>
+      </div>
+      {% endif %}
+
+      {% if psn_detail.acquisition_type %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Acquisition</dt>
+        <dd class="text-sm text-zinc-200">{{ psn_detail.acquisition_type | title }}</dd>
+      </div>
+      {% endif %}
+
+      {% if p.purchased_at %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Purchased</dt>
+        <dd class="text-sm text-zinc-200">{{ p.purchased_at }}</dd>
+      </div>
+      {% endif %}
+
+    </dl>
+  </div>
+  {% endif %}
+
+  <!-- GOG -->
+  {% if 'gog' in platform_data %}
+  {% set g = platform_data['gog'] %}
+  <div id="panel-gog" class="tab-panel {% if default_tab != 'gog' %}hidden{% endif %}">
+    <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
+
+      {% if gog_detail.release_date %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Release date</dt>
+        <dd class="text-sm text-zinc-200">{{ gog_detail.release_date }}</dd>
+      </div>
+      {% endif %}
+
+      {% if g.purchased_at %}
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Purchased</dt>
+        <dd class="text-sm text-zinc-200">{{ g.purchased_at }}</dd>
+      </div>
+      {% endif %}
+
+    </dl>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+<!-- ── Genres & Tags ──────────────────────────────────────────────────────── -->
+{% if genres or tags %}
+<div class="mb-8 border-t border-zinc-800 pt-6">
+  {% if genres %}
+  <div class="mb-3">
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Genres</p>
+    <div class="flex flex-wrap gap-1.5">
+      {% for g in genres %}
+      <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">{{ g }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% if tags %}
+  <div>
+    <p class="text-[11px] uppercase tracking-wider text-zinc-500 mb-2">Tags</p>
+    <div class="flex flex-wrap gap-1.5">
+      {% for t in tags %}
+      <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">{{ t }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Merged entries ─────────────────────────────────────────────────────── -->
+{% if merged_entries %}
+<div class="border-t border-zinc-800 pt-6">
+  <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">
+    Merged entries
+    <span class="ml-2 text-zinc-600 font-normal normal-case tracking-normal">— these were combined into this card</span>
+  </h2>
+  <div class="space-y-2" id="merged-list">
+    {% for entry in merged_entries %}
+    <div id="entry-{{ entry.id }}" class="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3">
+      <div>
+        <p class="text-sm text-zinc-200 font-medium mb-1">{{ entry.title }}</p>
+        <div class="flex gap-1.5">
+          {% for slug in entry.platforms %}
+          <span class="text-[9px] px-1.5 py-0.5 rounded font-medium border
+            {% if slug == 'steam' %}bg-blue-900/60 text-blue-300 border-blue-800
+            {% elif slug == 'gog' %}bg-purple-900/60 text-purple-300 border-purple-800
+            {% else %}bg-zinc-800 text-zinc-400 border-zinc-700{% endif %}">
+            {{ slug | upper }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      <button
+        onclick="doUnmerge({{ game.id }}, {{ entry.id }}, '{{ entry.title | replace("'", "\\'") }}', this)"
+        class="text-xs px-3 py-1.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-400
+               hover:border-red-700 hover:text-red-400 transition ml-4 flex-shrink-0">
+        Unmerge
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const GAME_ID = {{ game.id }};
+  let currentRating = '{{ prefs.rating or '' }}';
+  let isHidden = {{ 'true' if prefs.hidden else 'false' }};
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function setTab(slug) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('text-amber-400', 'border-amber-500');
+      b.classList.add('text-zinc-500', 'border-transparent');
+    });
+    document.getElementById(`panel-${slug}`)?.classList.remove('hidden');
+    const btn = document.getElementById(`tab-${slug}`);
+    if (btn) {
+      btn.classList.remove('text-zinc-500', 'border-transparent');
+      btn.classList.add('text-amber-400', 'border-amber-500');
+    }
+  }
+
+  // ── Rating ────────────────────────────────────────────────────────────────
+  async function detailSetRating(newRating) {
+    const rating = currentRating === newRating ? null : newRating;
+    const resp = await fetch(`/library/games/${GAME_ID}/rating`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ rating }),
+    });
+    if (!resp.ok) return;
+    currentRating = rating ?? '';
+
+    const upBtn   = document.getElementById('btn-up');
+    const downBtn = document.getElementById('btn-down');
+    const activeUp   = ['bg-green-600', 'border-green-600', 'text-white'];
+    const inactiveUp = ['bg-zinc-800', 'border-zinc-700', 'text-zinc-400'];
+    const activeDown   = ['bg-red-700', 'border-red-700', 'text-white'];
+    const inactiveDown = ['bg-zinc-800', 'border-zinc-700', 'text-zinc-400'];
+
+    upBtn.classList.remove(...activeUp, ...inactiveUp);
+    downBtn.classList.remove(...activeDown, ...inactiveDown);
+    upBtn.classList.add(...(rating === 'up' ? activeUp : inactiveUp));
+    downBtn.classList.add(...(rating === 'down' ? activeDown : inactiveDown));
+  }
+
+  // ── Hide ──────────────────────────────────────────────────────────────────
+  async function detailToggleHidden() {
+    const hidden = !isHidden;
+    const resp = await fetch(`/library/games/${GAME_ID}/hidden`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ hidden }),
+    });
+    if (!resp.ok) return;
+    isHidden = hidden;
+    const btn = document.getElementById('btn-hide');
+    btn.textContent = hidden ? 'Show in library' : 'Hide from library';
+    btn.classList.toggle('bg-zinc-700', hidden);
+    btn.classList.toggle('border-zinc-500', hidden);
+    btn.classList.toggle('text-zinc-200', hidden);
+    btn.classList.toggle('bg-zinc-800', !hidden);
+    btn.classList.toggle('border-zinc-700', !hidden);
+    btn.classList.toggle('text-zinc-400', !hidden);
+  }
+
+  // ── Unmerge ───────────────────────────────────────────────────────────────
+  async function doUnmerge(canonicalId, entryId, entryTitle, btn) {
+    if (!confirm(`Restore "${entryTitle}" as a separate card?\n\nThe two entries will appear independently again in your library.`)) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Unmerging…';
+
+    const resp = await fetch(`/library/games/${canonicalId}/unmerge`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ entry_game_id: entryId }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert(`Unmerge failed: ${err.error || resp.status}`);
+      btn.disabled = false;
+      btn.textContent = 'Unmerge';
+      return;
+    }
+
+    // Remove the entry row; if none left, remove the whole section
+    document.getElementById(`entry-${entryId}`)?.remove();
+    const list = document.getElementById('merged-list');
+    if (list && list.children.length === 0) {
+      list.closest('div.border-t')?.remove();
+    }
+
+    // Reload to refresh platform badges and tab data
+    location.reload();
+  }
+</script>
+
+{% endblock %}
