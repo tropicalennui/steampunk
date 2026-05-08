@@ -43,6 +43,7 @@ def igdb_lookup_by_external_id(
     igdb_client_id: str,
     category: int,
     uid: str,
+    _debug: bool = False,
 ) -> Optional[int]:
     """Return the IGDB game ID for a given platform external ID, or None."""
     try:
@@ -52,13 +53,40 @@ def igdb_lookup_by_external_id(
                 "Authorization": f"Bearer {igdb_token}",
                 "Client-ID": igdb_client_id,
             },
-            data=f'fields game; where category = {category} & uid = "{uid}";',
+            data=f'fields game; where external_game_source = {category} & uid = "{uid}";',
+            timeout=10,
+        )
+        if not resp.ok:
+            if _debug:
+                print(f"    IGDB {resp.status_code} for category={category} uid={uid!r}: {resp.text[:200]}")
+            return None
+        results = resp.json()
+        return results[0]["game"] if results else None
+    except (requests.RequestException, KeyError, IndexError):
+        return None
+
+
+def igdb_lookup_by_name(
+    igdb_token: str,
+    igdb_client_id: str,
+    title: str,
+) -> Optional[int]:
+    """Return the IGDB game ID for an exact title match, or None."""
+    escaped = title.replace('"', '\\"')
+    try:
+        resp = requests.post(
+            f"{IGDB_API_URL}/games",
+            headers={
+                "Authorization": f"Bearer {igdb_token}",
+                "Client-ID": igdb_client_id,
+            },
+            data=f'fields id; where name = "{escaped}" & version_parent = null; limit 1;',
             timeout=10,
         )
         if not resp.ok:
             return None
         results = resp.json()
-        return results[0]["game"] if results else None
+        return results[0]["id"] if results else None
     except (requests.RequestException, KeyError, IndexError):
         return None
 
@@ -67,6 +95,58 @@ def igdb_lookup_by_external_id(
 # IGDB matching pass
 # ---------------------------------------------------------------------------
 
+_PLATFORM_SOURCE: dict[int, int] = {
+    PLATFORM_STEAM: IGDB_STEAM_CATEGORY,
+    PLATFORM_PSN:   IGDB_PSN_CATEGORY,
+    PLATFORM_GOG:   IGDB_GOG_CATEGORY,
+}
+
+
+def _resolve_igdb_id(
+    igdb_token: str,
+    igdb_client_id: str,
+    platform_id: int,
+    external_id: str,
+    title: str,
+) -> Optional[int]:
+    """Try external-ID lookup first, fall back to exact name match."""
+    source = _PLATFORM_SOURCE.get(platform_id)
+    if source is None:
+        return None
+    igdb_id = igdb_lookup_by_external_id(igdb_token, igdb_client_id, source, external_id)
+    time.sleep(IGDB_DELAY)
+    if igdb_id is None:
+        igdb_id = igdb_lookup_by_name(igdb_token, igdb_client_id, title)
+        time.sleep(IGDB_DELAY)
+    return igdb_id
+
+
+def _apply_igdb_match(
+    conn: duckdb.DuckDBPyConnection,
+    game_id: int,
+    igdb_game_id: int,
+) -> None:
+    """Set igdb_id on the game row, merging into an existing canonical row if needed."""
+    existing = conn.execute(
+        "SELECT id FROM games WHERE igdb_id = ? AND id != ?",
+        [igdb_game_id, game_id],
+    ).fetchone()
+    if existing:
+        canonical_id = existing[0]
+        current_igdb = conn.execute(
+            "SELECT igdb_id FROM games WHERE id = ?", [game_id]
+        ).fetchone()
+        if current_igdb and current_igdb[0] and current_igdb[0] != igdb_game_id:
+            print(
+                f"  WARN: games.id={game_id} has igdb_id={current_igdb[0]} but "
+                f"lookup returned {igdb_game_id} — skipping merge"
+            )
+            return
+        _merge_games_rows(conn, duplicate_id=game_id, canonical_id=canonical_id)
+    else:
+        conn.execute("UPDATE games SET igdb_id = ? WHERE id = ?", [igdb_game_id, game_id])
+
+
 def run_igdb_matching(
     conn: duckdb.DuckDBPyConnection,
     igdb_token: str,
@@ -74,7 +154,7 @@ def run_igdb_matching(
 ) -> None:
     """For each platform_game whose parent games row has no igdb_id, attempt a lookup."""
     rows = conn.execute("""
-        SELECT pg.id AS pg_id, pg.platform_id, pg.external_id, pg.game_id
+        SELECT pg.id AS pg_id, pg.platform_id, pg.external_id, pg.game_id, g.title
         FROM platform_games pg
         JOIN games g ON g.id = pg.game_id
         WHERE g.igdb_id IS NULL
@@ -82,48 +162,17 @@ def run_igdb_matching(
 
     print(f"  {len(rows)} platform_games need IGDB lookup")
     matched = 0
+    not_found = 0
 
-    for pg_id, platform_id, external_id, game_id in rows:
-        if platform_id == PLATFORM_STEAM:
-            category = IGDB_STEAM_CATEGORY
-        elif platform_id == PLATFORM_PSN:
-            category = IGDB_PSN_CATEGORY
-        elif platform_id == PLATFORM_GOG:
-            category = IGDB_GOG_CATEGORY
-        else:
-            continue
-        igdb_game_id = igdb_lookup_by_external_id(igdb_token, igdb_client_id, category, external_id)
-        time.sleep(IGDB_DELAY)
-
+    for _pg_id, platform_id, external_id, game_id, title in rows:
+        igdb_game_id = _resolve_igdb_id(igdb_token, igdb_client_id, platform_id, external_id, title)
         if igdb_game_id is None:
+            not_found += 1
             continue
-
         matched += 1
+        _apply_igdb_match(conn, game_id, igdb_game_id)
 
-        existing = conn.execute(
-            "SELECT id FROM games WHERE igdb_id = ? AND id != ?",
-            [igdb_game_id, game_id],
-        ).fetchone()
-
-        if existing:
-            canonical_id = existing[0]
-            current_igdb = conn.execute(
-                "SELECT igdb_id FROM games WHERE id = ?", [game_id]
-            ).fetchone()
-            if current_igdb and current_igdb[0] and current_igdb[0] != igdb_game_id:
-                print(
-                    f"  WARN: games.id={game_id} has igdb_id={current_igdb[0]} but "
-                    f"lookup returned {igdb_game_id} — skipping merge"
-                )
-                continue
-            _merge_games_rows(conn, duplicate_id=game_id, canonical_id=canonical_id)
-        else:
-            conn.execute(
-                "UPDATE games SET igdb_id = ? WHERE id = ?",
-                [igdb_game_id, game_id],
-            )
-
-    print(f"  {matched} games matched to IGDB")
+    print(f"  {matched} games matched to IGDB ({not_found} not found in IGDB)")
 
 
 # ---------------------------------------------------------------------------

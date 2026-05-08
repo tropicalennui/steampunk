@@ -38,7 +38,7 @@ from collectors.igdb    import _sync_igdb
 from db import connect, init_db, load_secrets
 
 
-def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox"}) -> None:  # pragma: no cover
+def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox", "igdb"}) -> None:  # pragma: no cover
     secrets = load_secrets()
     init_db()
     conn = connect()
@@ -68,7 +68,10 @@ def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox"}) -> None
     else:
         print("\nSkipping Xbox sync (not selected)")
 
-    _sync_igdb(conn, secrets)
+    if "igdb" in platforms:
+        _sync_igdb(conn, secrets)
+    else:
+        print("\nSkipping IGDB sync (not selected)")
 
     conn.close()
     print("\nAll done.")
