@@ -250,6 +250,10 @@ class MergeBody(BaseModel):
     preferred_title: Optional[str] = None
 
 
+class UnmergeBody(BaseModel):
+    entry_game_id: int
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -496,3 +500,128 @@ async def merge_games(request: Request, body: MergeBody):
             return JSONResponse({"error": "merge failed"}, status_code=500)
 
     return JSONResponse({"surviving_game_id": survive})
+
+
+# ---------------------------------------------------------------------------
+# Game detail page
+# ---------------------------------------------------------------------------
+
+@router.get("/library/games/{game_id}")
+async def game_detail(request: Request, game_id: int):
+    user = _user(request)
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    with get_db() as conn:
+        game_rows = _query(
+            conn,
+            "SELECT id, title, cover_url, igdb_id FROM games WHERE id = ? AND merged_into IS NULL",
+            [game_id],
+        )
+        if not game_rows:
+            return templates.TemplateResponse(request, "404.html", {"user": user}, status_code=404)
+        game = game_rows[0]
+
+        platform_rows = _query(conn, """
+            SELECT p.slug, p.display_name, pg.external_id,
+                   l.playtime_mins, l.last_played_at, l.first_played_at,
+                   l.never_launched, l.purchased_at, l.purchase_source,
+                   COALESCE(a.completion_pct, 0.0) AS achievement_pct,
+                   a.unlocked_count, a.total_count,
+                   r.review_text
+            FROM games g
+            JOIN platform_games pg ON pg.game_id = g.id
+            JOIN platforms p        ON p.id = pg.platform_id
+            JOIN library l          ON l.platform_game_id = pg.id
+            LEFT JOIN achievements a ON a.platform_game_id = pg.id
+            LEFT JOIN reviews r      ON r.platform_game_id = pg.id
+            WHERE g.id = ? OR g.merged_into = ?
+            ORDER BY p.slug
+        """, [game_id, game_id])
+
+        platform_data = {row["slug"]: row for row in platform_rows}
+        platform_slugs = [s for s in ("steam", "psn", "gog") if s in platform_data]
+        if "steam" in platform_data:
+            default_tab = "steam"
+        else:
+            default_tab = next(iter(platform_slugs), None)
+
+        steam_detail: dict = {}
+        if "steam" in platform_data:
+            rows = _query(conn,
+                "SELECT genres, tags, categories, release_date FROM stg_steam_app_details "
+                "WHERE app_id = TRY_CAST(? AS INTEGER)",
+                [platform_data["steam"]["external_id"]])
+            steam_detail = rows[0] if rows else {}
+
+        psn_detail: dict = {}
+        if "psn" in platform_data:
+            rows = _query(conn,
+                "SELECT platform, acquisition_type, trophy_progress, trophies_earned, trophies_defined "
+                "FROM stg_psn_library WHERE np_communication_id = ?",
+                [platform_data["psn"]["external_id"]])
+            psn_detail = rows[0] if rows else {}
+
+        gog_detail: dict = {}
+        if "gog" in platform_data:
+            rows = _query(conn,
+                "SELECT release_date FROM stg_gog_library WHERE product_id = ?",
+                [platform_data["gog"]["external_id"]])
+            gog_detail = rows[0] if rows else {}
+
+        genres = [r["name"] for r in _query(conn,
+            "SELECT gn.name FROM game_genres gg JOIN genres gn ON gn.id = gg.genre_id WHERE gg.game_id = ?",
+            [game_id])]
+        tags = [r["name"] for r in _query(conn,
+            "SELECT t.name FROM game_tags gt JOIN tags t ON t.id = gt.tag_id WHERE gt.game_id = ?",
+            [game_id])]
+
+        avail_rows = _query(conn,
+            "SELECT platform_id, available FROM store_availability WHERE game_id = ?", [game_id])
+        availability = {r["platform_id"]: r["available"] for r in avail_rows}
+
+        prefs_rows = _query(conn,
+            "SELECT rating, hidden FROM user_game_prefs WHERE game_id = ?", [game_id])
+        prefs = prefs_rows[0] if prefs_rows else {"rating": None, "hidden": False}
+
+        merged_entries = _query(conn, """
+            SELECT g.id, g.title, list_distinct(list(p.slug)) AS platforms
+            FROM games g
+            JOIN platform_games pg ON pg.game_id = g.id
+            JOIN platforms p        ON p.id = pg.platform_id
+            WHERE g.merged_into = ?
+            GROUP BY g.id, g.title
+            ORDER BY g.title
+        """, [game_id])
+
+    return templates.TemplateResponse(request, "game_detail.html", {
+        "user": user,
+        "game": game,
+        "platform_slugs": platform_slugs,
+        "platform_data": platform_data,
+        "default_tab": default_tab,
+        "steam_detail": steam_detail,
+        "psn_detail": psn_detail,
+        "gog_detail": gog_detail,
+        "genres": genres,
+        "tags": tags,
+        "availability": availability,
+        "prefs": prefs,
+        "merged_entries": merged_entries,
+    })
+
+
+@router.post("/library/games/{game_id}/unmerge")
+async def unmerge_game(request: Request, game_id: int, body: UnmergeBody):
+    if not _user(request):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    with get_db() as conn:
+        rows = _query(conn,
+            "SELECT id FROM games WHERE id = ? AND merged_into = ?",
+            [body.entry_game_id, game_id])
+        if not rows:
+            return JSONResponse({"error": "entry not found or not merged into this game"}, status_code=400)
+        conn.execute("UPDATE games SET merged_into = NULL WHERE id = ?", [body.entry_game_id])
+
+    return JSONResponse({"unmerged_game_id": body.entry_game_id})
