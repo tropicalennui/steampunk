@@ -43,6 +43,7 @@ def igdb_lookup_by_external_id(
     igdb_client_id: str,
     category: int,
     uid: str,
+    _debug: bool = False,
 ) -> Optional[int]:
     """Return the IGDB game ID for a given platform external ID, or None."""
     try:
@@ -52,13 +53,40 @@ def igdb_lookup_by_external_id(
                 "Authorization": f"Bearer {igdb_token}",
                 "Client-ID": igdb_client_id,
             },
-            data=f'fields game; where category = {category} & uid = "{uid}";',
+            data=f'fields game; where external_game_source = {category} & uid = "{uid}";',
+            timeout=10,
+        )
+        if not resp.ok:
+            if _debug:
+                print(f"    IGDB {resp.status_code} for category={category} uid={uid!r}: {resp.text[:200]}")
+            return None
+        results = resp.json()
+        return results[0]["game"] if results else None
+    except (requests.RequestException, KeyError, IndexError):
+        return None
+
+
+def igdb_lookup_by_name(
+    igdb_token: str,
+    igdb_client_id: str,
+    title: str,
+) -> Optional[int]:
+    """Return the IGDB game ID for an exact title match, or None."""
+    escaped = title.replace('"', '\\"')
+    try:
+        resp = requests.post(
+            f"{IGDB_API_URL}/games",
+            headers={
+                "Authorization": f"Bearer {igdb_token}",
+                "Client-ID": igdb_client_id,
+            },
+            data=f'fields id; where name = "{escaped}" & version_parent = null; limit 1;',
             timeout=10,
         )
         if not resp.ok:
             return None
         results = resp.json()
-        return results[0]["game"] if results else None
+        return results[0]["id"] if results else None
     except (requests.RequestException, KeyError, IndexError):
         return None
 
@@ -74,7 +102,7 @@ def run_igdb_matching(
 ) -> None:
     """For each platform_game whose parent games row has no igdb_id, attempt a lookup."""
     rows = conn.execute("""
-        SELECT pg.id AS pg_id, pg.platform_id, pg.external_id, pg.game_id
+        SELECT pg.id AS pg_id, pg.platform_id, pg.external_id, pg.game_id, g.title
         FROM platform_games pg
         JOIN games g ON g.id = pg.game_id
         WHERE g.igdb_id IS NULL
@@ -82,8 +110,9 @@ def run_igdb_matching(
 
     print(f"  {len(rows)} platform_games need IGDB lookup")
     matched = 0
+    not_found = 0
 
-    for pg_id, platform_id, external_id, game_id in rows:
+    for pg_id, platform_id, external_id, game_id, title in rows:
         if platform_id == PLATFORM_STEAM:
             category = IGDB_STEAM_CATEGORY
         elif platform_id == PLATFORM_PSN:
@@ -92,10 +121,16 @@ def run_igdb_matching(
             category = IGDB_GOG_CATEGORY
         else:
             continue
+
         igdb_game_id = igdb_lookup_by_external_id(igdb_token, igdb_client_id, category, external_id)
         time.sleep(IGDB_DELAY)
 
         if igdb_game_id is None:
+            igdb_game_id = igdb_lookup_by_name(igdb_token, igdb_client_id, title)
+            time.sleep(IGDB_DELAY)
+
+        if igdb_game_id is None:
+            not_found += 1
             continue
 
         matched += 1
@@ -123,7 +158,7 @@ def run_igdb_matching(
                 [igdb_game_id, game_id],
             )
 
-    print(f"  {matched} games matched to IGDB")
+    print(f"  {matched} games matched to IGDB ({not_found} not found in IGDB)")
 
 
 # ---------------------------------------------------------------------------

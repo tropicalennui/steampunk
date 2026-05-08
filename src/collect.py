@@ -30,8 +30,8 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument(
         "--platforms",
         nargs="+",
-        choices=["steam", "gog", "psn", "switch", "xbox"],
-        default=["steam", "gog", "psn", "switch", "xbox"],
+        choices=["steam", "gog", "psn", "switch", "xbox", "igdb"],
+        default=["steam", "gog", "psn", "switch", "xbox", "igdb"],
         help="Which platform libraries to sync (default: all)",
     )
     args = parser.parse_args()

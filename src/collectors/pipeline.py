@@ -20,10 +20,41 @@ def _write_secrets(data: dict) -> None:
 
 def _merge_games_rows(conn, duplicate_id: int, canonical_id: int) -> None:
     """Re-point all references from duplicate_id to canonical_id, then delete duplicate."""
+    # DuckDB treats UPDATE as DELETE+INSERT for FK checking, so tables that reference
+    # platform_games.id (library, wishlist, achievements, reviews) must be temporarily
+    # removed before we can update platform_games.game_id, then restored afterwards.
+    pg_ids = [
+        r[0] for r in conn.execute(
+            "SELECT id FROM platform_games WHERE game_id = ?", [duplicate_id]
+        ).fetchall()
+    ]
+
+    _REF_TABLES = ["library", "wishlist", "achievements", "reviews"]
+    saved: dict[str, list] = {}
+    if pg_ids:
+        placeholders = ", ".join(["?"] * len(pg_ids))
+        for tbl in _REF_TABLES:
+            rows = conn.execute(
+                f"SELECT * FROM {tbl} WHERE platform_game_id IN ({placeholders})", pg_ids
+            ).fetchall()
+            if rows:
+                conn.execute(
+                    f"DELETE FROM {tbl} WHERE platform_game_id IN ({placeholders})", pg_ids
+                )
+            saved[tbl] = rows
+
     conn.execute(
         "UPDATE platform_games SET game_id = ? WHERE game_id = ?",
         [canonical_id, duplicate_id],
     )
+
+    for tbl in _REF_TABLES:
+        for row in saved.get(tbl, []):
+            n = len(row)
+            conn.execute(
+                f"INSERT INTO {tbl} VALUES ({', '.join(['?'] * n)}) ON CONFLICT DO NOTHING",
+                list(row),
+            )
     conn.execute("""
         INSERT INTO game_genres (game_id, genre_id)
         SELECT ?, genre_id FROM game_genres WHERE game_id = ?
@@ -46,15 +77,18 @@ def _merge_games_rows(conn, duplicate_id: int, canonical_id: int) -> None:
     """, [canonical_id, duplicate_id])
     conn.execute("DELETE FROM store_availability WHERE game_id = ?", [duplicate_id])
 
-    canonical_prefs = conn.execute(
-        "SELECT 1 FROM user_game_prefs WHERE game_id = ?", [canonical_id]
+    dup_prefs = conn.execute(
+        "SELECT rating, hidden, updated_at FROM user_game_prefs WHERE game_id = ?", [duplicate_id]
     ).fetchone()
-    if not canonical_prefs:
-        conn.execute(
-            "UPDATE user_game_prefs SET game_id = ? WHERE game_id = ?",
-            [canonical_id, duplicate_id],
-        )
-    else:
+    if dup_prefs:
         conn.execute("DELETE FROM user_game_prefs WHERE game_id = ?", [duplicate_id])
+        canonical_prefs = conn.execute(
+            "SELECT 1 FROM user_game_prefs WHERE game_id = ?", [canonical_id]
+        ).fetchone()
+        if not canonical_prefs:
+            conn.execute(
+                "INSERT INTO user_game_prefs (game_id, rating, hidden, updated_at) VALUES (?, ?, ?, ?)",
+                [canonical_id, dup_prefs[0], dup_prefs[1], dup_prefs[2]],
+            )
 
     conn.execute("DELETE FROM games WHERE id = ?", [duplicate_id])
