@@ -77,7 +77,7 @@ IGDB (api.igdb.com) is a Twitch-operated database with broad Steam and GOG cover
 **Matching strategy (during promote):**
 
 For each newly promoted `platform_game` with no `igdb_id` on its parent `games` row:
-1. Query IGDB `external_games` for the platform-specific ID (Steam: `category=1`, GOG: `category=5`) → returns IGDB `game.id`
+1. Query IGDB `external_games` for the platform-specific ID (Steam: `external_game_source=1`, GOG: `external_game_source=5`) → returns IGDB `game.id`
 2. Check whether another `platform_game` already has that `igdb_id` linked
 3. If yes: merge — point the new `platform_game.game_id` to the existing canonical `games` row
 4. If no: set `games.igdb_id` on the existing row
