@@ -3,7 +3,7 @@ title: "HLD: Game Detail View & Unmerge"
 date: 2026-05-05
 tags: [hld, library, detail-view, unmerge, merge]
 story: "[[US-015: Game Detail View & Unmerge]]"
-status: draft
+status: implemented
 ---
 
 ## Overview

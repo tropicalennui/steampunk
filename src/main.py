@@ -1005,7 +1005,10 @@ async def game_detail(request: Request, game_id: int):
 
         platform_data = {row["slug"]: row for row in platform_rows}
         platform_slugs = [s for s in ("steam", "psn", "gog") if s in platform_data]
-        default_tab = "steam" if "steam" in platform_data else (platform_slugs[0] if platform_slugs else None)
+        if "steam" in platform_data:
+            default_tab = "steam"
+        else:
+            default_tab = next(iter(platform_slugs), None)
 
         steam_detail: dict = {}
         if "steam" in platform_data:
@@ -1207,7 +1210,7 @@ async def merge_games(request: Request, body: MergeBody):
             conn.execute("UPDATE games SET merged_into = ? WHERE id = ?", [survive, discard])
 
             conn.execute("COMMIT")
-        except Exception as exc:
+        except Exception:
             conn.execute("ROLLBACK")
             logger.exception("merge_games failed: survive=%s discard=%s", survive, discard)
             return JSONResponse({"error": "merge failed"}, status_code=500)
