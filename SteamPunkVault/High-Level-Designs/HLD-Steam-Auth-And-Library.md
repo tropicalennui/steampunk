@@ -167,10 +167,17 @@ SteamPunk/
 ├── steampunk.duckdb           # database (gitignored)
 ├── src/
 │   ├── schema.sql             # DDL — stg_* + canonical tables
-│   ├── main.py                # FastAPI app, routes
+│   ├── main.py                # FastAPI app factory + patchable state
+│   ├── shared.py              # shared state: secrets, templates, get_db helpers
 │   ├── auth.py                # Steam OpenID logic
 │   ├── db.py                  # DuckDB connection + helpers
-│   ├── collect.py             # data pipeline (Steam → stg_* → canonical)
+│   ├── collect.py             # data pipeline entry point (shim → collectors/)
+│   ├── collectors/            # per-platform pipeline modules
+│   │   ├── steam.py, gog.py, psn.py, xbox.py, switch.py
+│   │   ├── igdb.py            # IGDB matching + store availability
+│   │   └── pipeline.py        # shared constants + merge helpers
+│   ├── routers/               # FastAPI route handlers
+│   │   ├── auth.py, library.py, sync.py, setup.py
 │   ├── profile.py             # preference profile builder (US-002)
 │   └── agent.py               # Claude agent (US-002)
 ├── templates/

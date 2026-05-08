@@ -28,6 +28,11 @@
       id="tab-switch"
       class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
     >Nintendo Switch</button>
+    <button
+      onclick="switchTab('xbox')"
+      id="tab-xbox"
+      class="tab-btn px-4 py-2 text-sm font-medium rounded-t-md transition border-b-2 -mb-px"
+    >Xbox</button>
   </div>
 
   <!-- ------------------------------------------------------------------ -->
@@ -199,14 +204,15 @@
         <span class="w-2 h-2 rounded-full bg-green-500"></span>
         <span class="text-sm text-gray-200">GOG account connected</span>
       </div>
-      <form method="POST" action="/auth/gog/disconnect">
-        <button
-          type="submit"
-          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
-        >
-          Disconnect
-        </button>
-      </form>
+      <div class="flex items-center gap-2">
+        <form method="POST" action="/sync">
+          <input type="hidden" name="platforms" value="gog">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition">Sync Now</button>
+        </form>
+        <form method="POST" action="/auth/gog/disconnect">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition">Disconnect</button>
+        </form>
+      </div>
     </div>
     {% else %}
     <!-- Two-step connect flow -->
@@ -307,14 +313,15 @@
           {% endif %}
         </div>
       </div>
-      <form method="POST" action="/auth/psn/disconnect">
-        <button
-          type="submit"
-          class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition"
-        >
-          Disconnect
-        </button>
-      </form>
+      <div class="flex items-center gap-2">
+        <form method="POST" action="/sync">
+          <input type="hidden" name="platforms" value="psn">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition">Sync Now</button>
+        </form>
+        <form method="POST" action="/auth/psn/disconnect">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition">Disconnect</button>
+        </form>
+      </div>
     </div>
     {% else %}
     <div class="space-y-8">
@@ -394,6 +401,98 @@
 
   </div>
 
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Xbox tab                                                            -->
+  <!-- ------------------------------------------------------------------ -->
+  <div id="panel-xbox" class="tab-panel hidden">
+
+    <p class="text-zinc-400 text-sm mb-6">
+      Connect your Xbox account to include your Xbox game library and achievement data
+      in the unified games view. SteamPunk will open a Microsoft login window in your
+      browser — no password is ever seen or stored by SteamPunk.
+    </p>
+
+    {% if error == 'xbox_token_failed' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      The token exchange with Microsoft failed. Try connecting again.
+    </div>
+    {% elif error == 'xbox_auth_failed' %}
+    <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">
+      Microsoft login was cancelled or failed. Try connecting again.
+    </div>
+    {% endif %}
+
+    {% if xbox_auth_expired %}
+    <div class="bg-zinc-800 border border-amber-700 rounded-lg p-4 mb-6 text-sm text-amber-300">
+      Your Xbox session has expired. Click Connect below to re-authenticate.
+    </div>
+    {% endif %}
+
+    {% if xbox_just_connected %}
+    <div class="bg-zinc-800 border border-green-700 rounded-lg p-4 mb-6 text-sm text-green-400">
+      Xbox connected successfully. Run a sync to import your library.
+    </div>
+    {% endif %}
+
+    {% if xbox_connected and not xbox_auth_expired %}
+    <!-- Connected state -->
+    <div class="flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+      <div class="flex items-center gap-3">
+        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        <span class="text-sm text-gray-200">Xbox account connected</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <form method="POST" action="/sync">
+          <input type="hidden" name="platforms" value="xbox">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition">Sync Now</button>
+        </form>
+        <form method="POST" action="/auth/xbox/disconnect">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded bg-zinc-800 border border-zinc-700 hover:border-red-700 text-zinc-400 hover:text-red-400 transition">Disconnect</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <!-- Connect flow -->
+    <div class="space-y-8">
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">1</div>
+        <div>
+          <p class="text-gray-200 font-medium">Click Connect Xbox below</p>
+          <p class="text-zinc-500 text-sm mt-0.5">
+            A Microsoft login page will open in your browser. Sign in with the Xbox account
+            you want to connect.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4">
+        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-zinc-950 font-bold text-sm flex items-center justify-center">2</div>
+        <div>
+          <p class="text-gray-200 font-medium">Complete the Microsoft sign-in</p>
+          <p class="text-zinc-500 text-sm mt-0.5">
+            After signing in, Microsoft will redirect your browser automatically.
+            This page will update once the connection is established.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <a
+          href="/auth/xbox"
+          class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold text-sm rounded-lg transition"
+        >
+          Connect Xbox
+        </a>
+        <p class="text-zinc-600 text-xs mt-3">
+          Tokens stored in <code>gandalf.json</code> — gitignored, never leaves this machine.
+        </p>
+      </div>
+
+    </div>
+    {% endif %}
+  </div>
+
 </div>
 
 <script>
@@ -414,7 +513,8 @@
 
   // On load: open the tab that has something to show, defaulting to Steam
   const initialTab =
-    {% if error in ('switch_no_code', 'switch_token_failed') or switch_auth_expired or switch_just_connected %}'switch'
+    {% if error in ('xbox_token_failed', 'xbox_auth_failed') or xbox_auth_expired or xbox_just_connected %}'xbox'
+    {% elif error in ('switch_no_code', 'switch_token_failed') or switch_auth_expired or switch_just_connected %}'switch'
     {% elif error in ('psn_empty_token',) or psn_auth_expired or psn_just_connected %}'psn'
     {% elif error in ('gog_no_credentials', 'gog_no_code', 'gog_token_failed') or gog_auth_expired or gog_just_connected %}'gog'
     {% else %}'steam'

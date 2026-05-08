@@ -20,7 +20,8 @@ INSERT OR IGNORE INTO platforms VALUES
     (1, 'steam',  'Steam'),
     (2, 'psn',    'PlayStation Network'),
     (3, 'gog',    'GOG'),
-    (4, 'switch', 'Nintendo Switch');
+    (4, 'switch', 'Nintendo Switch'),
+    (5, 'xbox',   'Xbox');
 
 CREATE SEQUENCE IF NOT EXISTS seq_tags START 1;
 
@@ -214,6 +215,25 @@ CREATE TABLE IF NOT EXISTS stg_switch_library (
     play_time_mins  INTEGER   NOT NULL DEFAULT 0,
     collected_at    TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
+
+
+-- -----------------------------------------------------------------------------
+-- Staging: Xbox
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS stg_xbox_library (
+    title_id            VARCHAR   PRIMARY KEY,
+    title               VARCHAR,
+    last_played         TIMESTAMP,
+    achievements_earned INTEGER,
+    achievements_total  INTEGER,
+    gamerscore_earned   INTEGER,
+    gamerscore_total    INTEGER,
+    collected_at        TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
+
+ALTER TABLE achievements ADD COLUMN IF NOT EXISTS gamerscore_earned INTEGER;
+ALTER TABLE achievements ADD COLUMN IF NOT EXISTS gamerscore_total  INTEGER;
 
 
 -- -----------------------------------------------------------------------------

@@ -6,3 +6,7 @@ httpx
 requests
 itsdangerous
 python-multipart
+xbox-webapi
+aiohttp
+pytest
+pytest-anyio
