@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/tropicalennui/steampunk/compare/v0.2.0...v0.2.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **igdb:** correct API field rename and DuckDB FK merge issue ([1cc36c4](https://github.com/tropicalennui/steampunk/commit/1cc36c4ff359684aa6ac78cb8623fe01ff293c01))
+* **igdb:** correct API field rename and DuckDB FK merge issue ([3ec0e2f](https://github.com/tropicalennui/steampunk/commit/3ec0e2fee7dba0ca1c2195c9c9938728e0c2ff6e))
+
 ## [0.2.0](https://github.com/tropicalennui/steampunk/compare/v0.1.0...v0.2.0) (2026-05-07)
 
 
