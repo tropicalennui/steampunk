@@ -5,9 +5,10 @@ A personal gaming library aggregator. SteamPunk pulls your game libraries from S
 ## Features
 
 - **Unified library** — games from Steam, GOG, PSN, Nintendo Switch, and Xbox Live in one place
-- **Sync pipeline** — refresh any or all platforms on demand; inspect detailed logs
+- **Sync pipeline** — refresh any or all platforms on demand; granular sub-syncs (e.g. Steam › Achievements only); inspect streaming logs
 - **Setup wizard** — guided first-run flow to connect each platform
-- **Achievement & trophy tracking** — completion percentages and gamerscore across platforms
+- **IGDB metadata** — game summaries, developers, publishers, first release dates, and aggregate ratings sourced from IGDB and shown on each game's detail page
+- **Achievement & trophy detail** — per-achievement icon grids with unlock dates for Steam; completion percentages and gamerscore across all platforms
 - **Store availability** — flags games you own on one platform that are also available on another
 
 ## Planned
@@ -88,7 +89,7 @@ src/
   collect.py        # Pipeline entry point (CLI shim)
   collectors/       # Per-platform data pipeline
     steam.py, gog.py, psn.py, switch.py, xbox.py
-    igdb.py         # IGDB matching + store availability
+    igdb.py         # IGDB matching, metadata enrichment + store availability
     pipeline.py     # Shared constants + merge helpers
   routers/          # FastAPI route handlers
     auth.py         # All /auth/* routes
