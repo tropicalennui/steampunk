@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/tropicalennui/steampunk/compare/v0.3.0...v0.4.0) (2026-05-09)
+
+
+### Features
+
+* **igdb:** add IGDB metadata staging and achievement detail view ([c4b6b91](https://github.com/tropicalennui/steampunk/commit/c4b6b913fd9e5b1aa71c096a62ad96b64a6f55c4))
+* **igdb:** IGDB metadata staging, IGDB filter, Steam achievement detail ([e5d475d](https://github.com/tropicalennui/steampunk/commit/e5d475dd553e93a0aedb7e937944ff12c224be06))
+
 ## [0.3.0](https://github.com/tropicalennui/steampunk/compare/v0.2.1...v0.3.0) (2026-05-08)
 
 
