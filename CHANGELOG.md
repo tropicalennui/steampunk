@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/tropicalennui/steampunk/compare/v0.2.1...v0.3.0) (2026-05-08)
+
+
+### Features
+
+* **library:** game detail page and per-entry unmerge ([311372c](https://github.com/tropicalennui/steampunk/commit/311372c099e7a36e93da35afca1834b0d0212718))
+
 ## [0.2.1](https://github.com/tropicalennui/steampunk/compare/v0.2.0...v0.2.1) (2026-05-08)
 
 
