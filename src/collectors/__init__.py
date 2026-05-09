@@ -28,7 +28,7 @@ from collectors.pipeline import (
     IGDB_STEAM_CATEGORY, IGDB_GOG_CATEGORY, IGDB_PSN_CATEGORY,
 )
 
-from collectors.steam   import _sync_steam
+from collectors.steam   import _sync_steam, _sync_steam_library, _sync_steam_achievements, _sync_steam_wishlist
 from collectors.gog     import _sync_gog
 from collectors.psn     import _sync_psn
 from collectors.switch  import _sync_switch
@@ -38,15 +38,28 @@ from collectors.igdb    import _sync_igdb
 from db import connect, init_db, load_secrets
 
 
+def _run_steam(conn, secrets: dict, platforms: set[str]) -> None:  # pragma: no cover
+    steam_tokens = {p for p in platforms if p == "steam" or p.startswith("steam:")}
+    if not steam_tokens:
+        print("Skipping Steam sync (not selected)")
+        return
+    if "steam" in steam_tokens:
+        _sync_steam(conn, secrets)
+        return
+    if "steam:library" in steam_tokens:
+        _sync_steam_library(conn, secrets)
+    if "steam:achievements" in steam_tokens:
+        _sync_steam_achievements(conn, secrets)
+    if "steam:wishlist" in steam_tokens:
+        _sync_steam_wishlist(conn, secrets)
+
+
 def run(platforms: set[str] = {"steam", "gog", "psn", "switch", "xbox", "igdb"}) -> None:  # pragma: no cover
     secrets = load_secrets()
     init_db()
     conn = connect()
 
-    if "steam" in platforms:
-        _sync_steam(conn, secrets)
-    else:
-        print("Skipping Steam sync (not selected)")
+    _run_steam(conn, secrets, platforms)
 
     if "gog" in platforms:
         _sync_gog(conn, secrets)
@@ -83,8 +96,9 @@ if __name__ == "__main__":  # pragma: no cover
     parser.add_argument(
         "--platforms",
         nargs="+",
-        choices=["steam", "gog", "psn", "switch", "xbox"],
-        default=["steam", "gog", "psn", "switch", "xbox"],
+        choices=["steam", "steam:library", "steam:achievements", "steam:wishlist",
+                 "gog", "psn", "switch", "xbox", "igdb"],
+        default=["steam", "gog", "psn", "switch", "xbox", "igdb"],
         help="Which platform libraries to sync (default: all)",
     )
     args = parser.parse_args()

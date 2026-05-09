@@ -30,10 +30,16 @@
   <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
 
     <h2 class="text-lg font-semibold text-gray-200 mb-1">Connect Steam</h2>
-    <p class="text-zinc-400 text-sm mb-6">
+    <p class="text-zinc-400 text-sm mb-4">
       SteamPunk needs your Steam API key to read your library. This key is stored only on
       this machine and is never shared.
     </p>
+    <div class="bg-amber-950/40 border border-amber-800/60 rounded-lg px-4 py-3 mb-6 text-xs text-amber-300 space-y-1">
+      <p class="font-semibold">Steam privacy requirements</p>
+      <p><strong class="text-amber-200">Library sync</strong> works regardless of your privacy settings.</p>
+      <p><strong class="text-amber-200">Achievement sync</strong> requires your Steam profile privacy settings to have both <strong class="text-white">Profile</strong> and <strong class="text-white">Game details</strong> set to <strong class="text-white">Public</strong>.</p>
+      <p class="text-amber-500">You can change these at any time: Steam → Edit Profile → Privacy Settings.</p>
+    </div>
 
     {% if error == 'invalid' %}
     <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-6 text-sm text-red-400">

@@ -1,8 +1,11 @@
 ---
 title: "Guide: Automated Test Suite"
 date: 2026-05-07
-tags: [user-guide, testing, quality]
-story: "[[US-017: Automated Test Suite]]"
+tags:
+  - user-guide
+  - testing
+  - quality
+story: "[[US-017-Automated-Test-Suite]]"
 ---
 
 ## Overview

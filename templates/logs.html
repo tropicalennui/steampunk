@@ -3,14 +3,43 @@
 
 {% block content %}
 
-<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
   <div>
     <h1 class="text-2xl font-bold text-amber-400">Sync Logs</h1>
     {% if sync_running %}
     <p class="text-amber-400 text-sm animate-pulse mt-0.5">Sync in progress&hellip;</p>
     {% endif %}
   </div>
-  <div class="flex items-center gap-4">
+  <div class="flex items-center gap-3 flex-wrap">
+
+    <!-- Sync split-button -->
+    <form method="POST" action="/sync" id="logs-sync-form">
+      <input type="hidden" name="platforms" id="logs-sync-platforms" value="all" />
+      <div class="relative flex items-center" id="logs-sync-menu">
+        <button
+          type="submit"
+          class="text-xs px-3 py-1.5 rounded-l bg-zinc-800 border border-zinc-700 border-r-0 hover:border-amber-600 text-zinc-300 hover:text-amber-400 transition"
+          {% if sync_running %}disabled{% endif %}
+        >Sync Now</button>
+        <button
+          type="button"
+          onclick="document.getElementById('logs-sync-dropdown').classList.toggle('hidden')"
+          class="text-xs px-1.5 py-1.5 rounded-r bg-zinc-800 border border-zinc-700 hover:border-amber-600 text-zinc-400 hover:text-amber-400 transition"
+          {% if sync_running %}disabled{% endif %}
+        >&#9660;</button>
+        <div id="logs-sync-dropdown" class="hidden absolute top-full right-0 mt-1 w-44 bg-zinc-800 border border-zinc-700 rounded-md shadow-lg z-50">
+          <button type="button" onclick="submitLogsSync('steam')"              class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-t-md">Steam</button>
+          <button type="button" onclick="submitLogsSync('steam:library')"      class="block w-full text-left px-4 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700">Steam &rsaquo; Library</button>
+          <button type="button" onclick="submitLogsSync('steam:achievements')" class="block w-full text-left px-4 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700">Steam &rsaquo; Achievements</button>
+          <button type="button" onclick="submitLogsSync('steam:wishlist')"     class="block w-full text-left px-4 py-1.5 text-xs text-zinc-400 hover:bg-zinc-700 border-b border-zinc-700">Steam &rsaquo; Wishlist</button>
+          <button type="button" onclick="submitLogsSync('gog')"                class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">GOG</button>
+          <button type="button" onclick="submitLogsSync('psn')"                class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">PlayStation</button>
+          <button type="button" onclick="submitLogsSync('xbox')"               class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700">Xbox</button>
+          <button type="button" onclick="submitLogsSync('igdb')"               class="block w-full text-left px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 rounded-b-md">IGDB / Twitch</button>
+        </div>
+      </div>
+    </form>
+
     <button
       type="button"
       onclick="copyLog(this)"
@@ -60,9 +89,46 @@
 <script>
   const el = document.getElementById('log-output');
   el.scrollTop = el.scrollHeight;
+
   {% if sync_running %}
-  setTimeout(() => location.reload(), 2000);
+  let tailOffset = {{ initial_offset }};
+  const tailFile  = {{ selected | tojson }};
+
+  async function pollLog() {
+    try {
+      const res  = await fetch(`/logs/tail?file=${encodeURIComponent(tailFile)}&offset=${tailOffset}`);
+      const data = await res.json();
+      if (data.content) {
+        const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 40;
+        el.textContent += data.content;
+        if (atBottom) el.scrollTop = el.scrollHeight;
+      }
+      tailOffset = data.offset;
+      if (data.sync_running) {
+        setTimeout(pollLog, 1000);
+      } else {
+        // Sync just finished — reload once to update the header and button states
+        location.reload();
+      }
+    } catch {
+      setTimeout(pollLog, 2000);
+    }
+  }
+
+  setTimeout(pollLog, 1000);
   {% endif %}
+
+  function submitLogsSync(platform) {
+    document.getElementById('logs-sync-platforms').value = platform;
+    document.getElementById('logs-sync-dropdown').classList.add('hidden');
+    document.getElementById('logs-sync-form').submit();
+  }
+
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('logs-sync-menu');
+    if (menu && !menu.contains(e.target))
+      document.getElementById('logs-sync-dropdown')?.classList.add('hidden');
+  });
 
   function copyLog(btn) {
     const text = document.getElementById('log-output').textContent;

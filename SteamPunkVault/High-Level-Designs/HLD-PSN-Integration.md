@@ -3,7 +3,7 @@ title: "HLD: PSN Integration"
 date: 2026-05-03
 tags: [hld, psn, playstation, library, multi-platform, trophies]
 story: "[[US-008: PSN Integration]]"
-status: draft
+status: implemented
 ---
 
 ## Overview
@@ -164,6 +164,6 @@ Trophy completion % on PSN entries is surfaced to the preference agent as an eng
 
 ## Open Questions
 
-1. **IGDB PSN category:** Confirm `category = 45` for PlayStation Network in the IGDB `external_games` schema before implementation. If wrong, the IGDB matching pass will silently produce no PSN matches.
+1. **IGDB PSN category:** ~~Confirm `category = 45`~~ **Resolved:** `IGDB_PSN_CATEGORY = 36` (PlayStation Store US) — confirmed during implementation and set in `collectors/pipeline.py`.
 2. **Library completeness:** Empirically verify during implementation whether `trophy_titles()` covers all owned games or only trophy-active ones. If coverage is materially incomplete, evaluate whether PSN purchase history endpoints (less reliable, region-specific) are worth adding.
 3. **PS Plus acquisition detection:** Confirm whether `psnawp` exposes a reliable flag for PS Plus vs. purchased titles, or whether heuristics are needed.

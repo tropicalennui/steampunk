@@ -23,11 +23,14 @@
   </div>
 
   <h2 class="text-xl font-bold text-gray-200 mb-2">Steam Session Cookie</h2>
-  <p class="text-zinc-400 text-sm mb-8">
-    To access your full library without making your Steam profile public, SteamPunk needs
-    your Steam session cookie. This is a read-only token —
+  <p class="text-zinc-400 text-sm mb-4">
+    Your Steam session cookie lets SteamPunk read your library data. This is a read-only token —
     it is <strong class="text-white">never used to perform any action</strong> on your account.
   </p>
+  <div class="bg-amber-950/40 border border-amber-800/60 rounded-lg px-4 py-3 mb-6 text-xs text-amber-300 space-y-1">
+    <p class="font-semibold">Note on Steam privacy</p>
+    <p>The session cookie enables library sync regardless of your privacy settings. However, <strong class="text-white">achievement sync requires your Steam profile and Game details to be set to Public</strong> in Steam's Privacy Settings.</p>
+  </div>
 
   {% if error %}
   <div class="bg-zinc-800 border border-red-700 rounded-lg p-4 mb-8 text-sm text-red-400">

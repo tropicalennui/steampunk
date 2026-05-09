@@ -146,6 +146,37 @@
       <p class="text-sm text-zinc-300 leading-relaxed">{{ s.review_text }}</p>
     </div>
     {% endif %}
+
+    {% if achievement_details %}
+    <div class="mt-6">
+      <p class="text-[11px] uppercase tracking-wider text-zinc-500 mb-3">
+        Achievements
+        <span class="ml-2 normal-case tracking-normal text-zinc-600">{{ achievement_details | selectattr('achieved') | list | length }} unlocked of {{ achievement_details | length }}</span>
+      </p>
+      <div class="flex flex-wrap gap-2">
+        {% for a in achievement_details %}
+        <div class="relative group flex-shrink-0">
+          <img
+            src="{{ a.icon_url if a.achieved else a.icon_gray_url }}"
+            alt="{{ a.display_name }}"
+            width="48" height="48"
+            class="rounded {% if not a.achieved %}opacity-40{% endif %}"
+            loading="lazy"
+          />
+          <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-xl z-50 hidden group-hover:block pointer-events-none">
+            <p class="font-semibold text-zinc-200 mb-0.5">{{ a.display_name }}</p>
+            {% if a.description %}<p class="text-zinc-400 leading-snug mb-1">{{ a.description }}</p>{% endif %}
+            {% if a.achieved and a.unlock_time %}
+            <p class="text-amber-500"><span data-utc="{{ a.unlock_time }}">{{ a.unlock_time }}</span></p>
+            {% elif not a.achieved %}
+            <p class="text-zinc-600">Locked</p>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -247,6 +278,67 @@
 </div>
 {% endif %}
 
+<!-- ── IGDB metadata ──────────────────────────────────────────────────────── -->
+{% if igdb_detail %}
+<div class="mb-8 border-t border-zinc-800 pt-6">
+  <h2 class="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">IGDB</h2>
+
+  {% if igdb_detail.summary %}
+  <div class="mb-5">
+    <p id="igdb-summary-short" class="text-sm text-zinc-300 leading-relaxed">
+      {% if igdb_detail.summary | length > 300 %}
+        {{ igdb_detail.summary[:300].rsplit(' ', 1)[0] }}&hellip;
+      {% else %}
+        {{ igdb_detail.summary }}
+      {% endif %}
+    </p>
+    {% if igdb_detail.summary | length > 300 %}
+    <p id="igdb-summary-full" class="text-sm text-zinc-300 leading-relaxed hidden">{{ igdb_detail.summary }}</p>
+    <button onclick="igdbToggleSummary()" id="igdb-readmore"
+      class="mt-1 text-xs text-amber-500 hover:text-amber-400 transition">Read more</button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
+
+    {% if igdb_detail.developer %}
+    <div>
+      <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Developer</dt>
+      <dd class="text-sm text-zinc-200">{{ igdb_detail.developer | join(', ') }}</dd>
+    </div>
+    {% endif %}
+
+    {% if igdb_detail.publisher %}
+    <div>
+      <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Publisher</dt>
+      <dd class="text-sm text-zinc-200">{{ igdb_detail.publisher | join(', ') }}</dd>
+    </div>
+    {% endif %}
+
+    {% if igdb_detail.first_release_date %}
+    <div>
+      <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">First released</dt>
+      <dd class="text-sm text-zinc-200">{{ igdb_detail.first_release_date }}</dd>
+    </div>
+    {% endif %}
+
+    {% if igdb_detail.aggregated_rating is not none %}
+    <div>
+      <dt class="text-[11px] uppercase tracking-wider text-zinc-500 mb-0.5">Rating</dt>
+      <dd class="text-sm text-zinc-200">
+        {{ igdb_detail.aggregated_rating | round(0) | int }} / 100
+        {% if igdb_detail.aggregated_rating_count %}
+        <span class="text-zinc-500 ml-1">({{ igdb_detail.aggregated_rating_count }} ratings)</span>
+        {% endif %}
+      </dd>
+    </div>
+    {% endif %}
+
+  </dl>
+</div>
+{% endif %}
+
 <!-- ── Merged entries ─────────────────────────────────────────────────────── -->
 {% if merged_entries %}
 <div class="border-t border-zinc-800 pt-6">
@@ -286,6 +378,17 @@
   const GAME_ID = {{ game.id }};
   let currentRating = '{{ prefs.rating or '' }}';
   let isHidden = {{ 'true' if prefs.hidden else 'false' }};
+
+  // ── IGDB summary expand/collapse ─────────────────────────────────────────
+  function igdbToggleSummary() {
+    const short  = document.getElementById('igdb-summary-short');
+    const full   = document.getElementById('igdb-summary-full');
+    const btn    = document.getElementById('igdb-readmore');
+    const expand = short && !short.classList.contains('hidden');
+    short?.classList.toggle('hidden', expand);
+    full?.classList.toggle('hidden', !expand);
+    if (btn) btn.textContent = expand ? 'Read less' : 'Read more';
+  }
 
   // ── Tab switching ─────────────────────────────────────────────────────────
   function setTab(slug) {

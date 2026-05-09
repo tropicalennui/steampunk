@@ -1,12 +1,12 @@
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Optional
 
 import duckdb
 import requests
 
 from collectors.pipeline import (
-    PLATFORM_STEAM, PLATFORM_PSN, PLATFORM_GOG,
+    PLATFORM_STEAM, PLATFORM_PSN, PLATFORM_GOG, PLATFORM_XBOX,
     IGDB_STEAM_CATEGORY, IGDB_GOG_CATEGORY, IGDB_PSN_CATEGORY,
     _merge_games_rows,
 )
@@ -102,6 +102,9 @@ _PLATFORM_SOURCE: dict[int, int] = {
 }
 
 
+_NAME_ONLY_PLATFORMS = frozenset({PLATFORM_XBOX})
+
+
 def _resolve_igdb_id(
     igdb_token: str,
     igdb_client_id: str,
@@ -109,15 +112,20 @@ def _resolve_igdb_id(
     external_id: str,
     title: str,
 ) -> Optional[int]:
-    """Try external-ID lookup first, fall back to exact name match."""
+    """Try external-ID lookup first (where available), fall back to exact name match."""
     source = _PLATFORM_SOURCE.get(platform_id)
-    if source is None:
+    if source is None and platform_id not in _NAME_ONLY_PLATFORMS:
         return None
-    igdb_id = igdb_lookup_by_external_id(igdb_token, igdb_client_id, source, external_id)
-    time.sleep(IGDB_DELAY)
+
+    igdb_id: Optional[int] = None
+    if source is not None:
+        igdb_id = igdb_lookup_by_external_id(igdb_token, igdb_client_id, source, external_id)
+        time.sleep(IGDB_DELAY)
+
     if igdb_id is None:
         igdb_id = igdb_lookup_by_name(igdb_token, igdb_client_id, title)
         time.sleep(IGDB_DELAY)
+
     return igdb_id
 
 
@@ -173,6 +181,118 @@ def run_igdb_matching(
         _apply_igdb_match(conn, game_id, igdb_game_id)
 
     print(f"  {matched} games matched to IGDB ({not_found} not found in IGDB)")
+
+
+# ---------------------------------------------------------------------------
+# IGDB metadata pass
+# ---------------------------------------------------------------------------
+
+_METADATA_FIELDS = (
+    "id,summary,aggregated_rating,aggregated_rating_count,"
+    "first_release_date,"
+    "involved_companies.company.name,"
+    "involved_companies.developer,"
+    "involved_companies.publisher"
+)
+
+
+def _fetch_igdb_metadata(
+    igdb_token: str,
+    igdb_client_id: str,
+    igdb_id: int,
+) -> Optional[dict]:
+    """Fetch summary, companies, rating, and release date for one IGDB game."""
+    try:
+        resp = requests.post(
+            f"{IGDB_API_URL}/games",
+            headers={
+                "Authorization": f"Bearer {igdb_token}",
+                "Client-ID": igdb_client_id,
+            },
+            data=f"fields {_METADATA_FIELDS}; where id = {igdb_id}; limit 1;",
+            timeout=10,
+        )
+        if not resp.ok:
+            return None
+        results = resp.json()
+        return results[0] if results else None
+    except (requests.RequestException, KeyError, IndexError):
+        return None
+
+
+def _parse_metadata(raw: dict) -> dict:
+    """Flatten raw IGDB game response into the stg_igdb column values."""
+    developers: list[str] = []
+    publishers: list[str] = []
+    for ic in raw.get("involved_companies") or []:
+        name = (ic.get("company") or {}).get("name")
+        if not name:
+            continue
+        if ic.get("developer"):
+            developers.append(name)
+        if ic.get("publisher"):
+            publishers.append(name)
+
+    release_date: Optional[date] = None
+    epoch = raw.get("first_release_date")
+    if epoch is not None:
+        try:
+            release_date = datetime.fromtimestamp(epoch, UTC).date()
+        except (OSError, OverflowError, ValueError):
+            pass
+
+    return {
+        "summary": raw.get("summary"),
+        "developer": developers or None,
+        "publisher": publishers or None,
+        "first_release_date": release_date,
+        "aggregated_rating": raw.get("aggregated_rating"),
+        "aggregated_rating_count": raw.get("aggregated_rating_count"),
+    }
+
+
+def run_igdb_metadata(
+    conn: duckdb.DuckDBPyConnection,
+    igdb_token: str,
+    igdb_client_id: str,
+) -> None:
+    """For each games row with an igdb_id not yet in stg_igdb, fetch and upsert metadata."""
+    rows = conn.execute("""
+        SELECT DISTINCT g.igdb_id
+        FROM games g
+        WHERE g.igdb_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM stg_igdb s WHERE s.igdb_id = g.igdb_id)
+    """).fetchall()
+
+    print(f"  {len(rows)} IGDB games need metadata fetch")
+    now = datetime.now(UTC)
+
+    for (igdb_id,) in rows:
+        raw = _fetch_igdb_metadata(igdb_token, igdb_client_id, igdb_id)
+        time.sleep(IGDB_DELAY)
+        if raw is None:
+            continue
+        m = _parse_metadata(raw)
+        conn.execute("""
+            INSERT INTO stg_igdb
+                (igdb_id, summary, developer, publisher,
+                 first_release_date, aggregated_rating, aggregated_rating_count, collected_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (igdb_id) DO UPDATE SET
+                summary                 = excluded.summary,
+                developer               = excluded.developer,
+                publisher               = excluded.publisher,
+                first_release_date      = excluded.first_release_date,
+                aggregated_rating       = excluded.aggregated_rating,
+                aggregated_rating_count = excluded.aggregated_rating_count,
+                collected_at            = excluded.collected_at
+        """, [
+            igdb_id, m["summary"], m["developer"], m["publisher"],
+            m["first_release_date"], m["aggregated_rating"],
+            m["aggregated_rating_count"], now,
+        ])
+
+    print("  IGDB metadata pass complete")
 
 
 # ---------------------------------------------------------------------------
@@ -315,5 +435,7 @@ def _sync_igdb(conn: duckdb.DuckDBPyConnection, secrets: dict) -> None:  # pragm
 
     print("Running IGDB matching pass...")
     run_igdb_matching(conn, igdb_token, igdb_client_id)
+    print("Running IGDB metadata pass...")
+    run_igdb_metadata(conn, igdb_token, igdb_client_id)
     print("Running store availability pass...")
     run_store_availability(conn, igdb_token, igdb_client_id)

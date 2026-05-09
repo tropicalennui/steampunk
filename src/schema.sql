@@ -161,6 +161,19 @@ CREATE TABLE IF NOT EXISTS stg_steam_achievements (
     collected_at    TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
 
+CREATE TABLE IF NOT EXISTS stg_steam_achievement_details (
+    app_id        INTEGER   NOT NULL,
+    api_name      VARCHAR   NOT NULL,
+    display_name  VARCHAR,
+    description   VARCHAR,
+    icon_url      VARCHAR,
+    icon_gray_url VARCHAR,
+    achieved      BOOLEAN   NOT NULL DEFAULT FALSE,
+    unlock_time   TIMESTAMP,
+    collected_at  TIMESTAMP NOT NULL DEFAULT current_timestamp,
+    PRIMARY KEY (app_id, api_name)
+);
+
 CREATE TABLE IF NOT EXISTS stg_steam_wishlist (
     app_id       INTEGER   PRIMARY KEY,
     added_at     TIMESTAMP,
@@ -234,6 +247,22 @@ CREATE TABLE IF NOT EXISTS stg_xbox_library (
 
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS gamerscore_earned INTEGER;
 ALTER TABLE achievements ADD COLUMN IF NOT EXISTS gamerscore_total  INTEGER;
+
+
+-- -----------------------------------------------------------------------------
+-- Staging: IGDB metadata
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS stg_igdb (
+    igdb_id                 INTEGER   PRIMARY KEY,
+    summary                 VARCHAR,
+    developer               VARCHAR[],
+    publisher               VARCHAR[],
+    first_release_date      DATE,
+    aggregated_rating       DOUBLE,
+    aggregated_rating_count INTEGER,
+    collected_at            TIMESTAMP NOT NULL DEFAULT current_timestamp
+);
 
 
 -- -----------------------------------------------------------------------------

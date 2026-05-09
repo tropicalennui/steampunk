@@ -1,5 +1,11 @@
 # SteamPunk Workspace — Claude Code Conventions
 
+## Runtime Safety
+
+**Never edit any file while a sync is running.** The dev server runs with hot-reload (WatchFiles). Any file change — including `.py`, `.html`, `.sql`, or any other watched file — triggers an immediate server restart that kills the active sync process mid-run, corrupting or losing that run's data.
+
+Before making any code or template change, confirm the sync has finished (log page shows completion, or the user confirms it). If unsure, ask.
+
 ## Security & Privacy
 
 - **PII must never be committed.** Any file containing personal data must be gitignored. See `.gitignore` for patterns; add new patterns immediately if a new PII format is introduced.
@@ -84,6 +90,7 @@ Do not begin implementation until both the User Story and HLD exist. Do not mark
 | `SteamPunkVault/Stories/` | User Stories (one file per feature) |
 | `SteamPunkVault/High-Level-Designs/` | High-Level Design documents |
 | `SteamPunkVault/User-Guides/` | End-user guides and how-tos |
+| `SteamPunkVault/Ideas/` | Possible future features — investigated but not yet committed to a story |
 
 ## Document Templates
 

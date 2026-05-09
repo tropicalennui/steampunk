@@ -184,6 +184,7 @@ def _build_list_query(
     col_keys: list[str],
     q: Optional[str],
     show_hidden: bool,
+    igdb_match: Optional[str] = None,
 ) -> tuple[str, list]:
     selects = [
         "g.id AS game_id",
@@ -216,6 +217,11 @@ def _build_list_query(
     if q:
         where_parts.append("lower(g.title) LIKE ?")
         params.append(f"%{q.lower()}%")
+
+    if igdb_match == "matched":
+        where_parts.append("g.igdb_id IS NOT NULL")
+    elif igdb_match == "unmatched":
+        where_parts.append("g.igdb_id IS NULL")
 
     sql = (
         f"SELECT {', '.join(selects)}\n"
@@ -283,7 +289,8 @@ async def library(request: Request, show_hidden: bool = False):
                 COALESCE(bool_or(sa.platform_id = 1 AND sa.available), FALSE) AS available_on_steam,
                 COALESCE(bool_or(sa.platform_id = 3 AND sa.available), FALSE) AS available_on_gog,
                 ugp.rating,
-                COALESCE(ugp.hidden, FALSE)                            AS hidden
+                COALESCE(ugp.hidden, FALSE)                            AS hidden,
+                (ANY_VALUE(cg.igdb_id) IS NOT NULL)                    AS has_igdb
             FROM games g
             JOIN games cg           ON cg.id = COALESCE(g.merged_into, g.id)
             JOIN platform_games pg  ON pg.game_id = g.id
@@ -421,12 +428,15 @@ async def api_library_games(
     columns:     str  = "",
     q:           str  = "",
     show_hidden: bool = False,
+    igdb_match:  str  = "",
 ):
     if not _user(request):
         return JSONResponse({"error": "unauthorized"}, status_code=401)
 
     col_keys = [c.strip() for c in columns.split(",") if c.strip()] if columns else []
-    sql, params = _build_list_query(platform or None, col_keys, q or None, show_hidden)
+    sql, params = _build_list_query(
+        platform or None, col_keys, q or None, show_hidden, igdb_match or None
+    )
 
     with get_db() as conn:
         rows = _query(conn, sql, params)
@@ -506,6 +516,33 @@ async def merge_games(request: Request, body: MergeBody):
 # Game detail page
 # ---------------------------------------------------------------------------
 
+def _fetch_platform_details(conn, platform_data: dict) -> tuple[dict, dict, dict]:
+    steam_detail: dict = {}
+    if "steam" in platform_data:
+        rows = _query(conn,
+            "SELECT genres, tags, categories, release_date FROM stg_steam_app_details "
+            "WHERE app_id = TRY_CAST(? AS INTEGER)",
+            [platform_data["steam"]["external_id"]])
+        steam_detail = rows[0] if rows else {}
+
+    psn_detail: dict = {}
+    if "psn" in platform_data:
+        rows = _query(conn,
+            "SELECT platform, acquisition_type, trophy_progress, trophies_earned, trophies_defined "
+            "FROM stg_psn_library WHERE np_communication_id = ?",
+            [platform_data["psn"]["external_id"]])
+        psn_detail = rows[0] if rows else {}
+
+    gog_detail: dict = {}
+    if "gog" in platform_data:
+        rows = _query(conn,
+            "SELECT release_date FROM stg_gog_library WHERE product_id = ?",
+            [platform_data["gog"]["external_id"]])
+        gog_detail = rows[0] if rows else {}
+
+    return steam_detail, psn_detail, gog_detail
+
+
 @router.get("/library/games/{game_id}")
 async def game_detail(request: Request, game_id: int):
     user = _user(request)
@@ -546,28 +583,7 @@ async def game_detail(request: Request, game_id: int):
         else:
             default_tab = next(iter(platform_slugs), None)
 
-        steam_detail: dict = {}
-        if "steam" in platform_data:
-            rows = _query(conn,
-                "SELECT genres, tags, categories, release_date FROM stg_steam_app_details "
-                "WHERE app_id = TRY_CAST(? AS INTEGER)",
-                [platform_data["steam"]["external_id"]])
-            steam_detail = rows[0] if rows else {}
-
-        psn_detail: dict = {}
-        if "psn" in platform_data:
-            rows = _query(conn,
-                "SELECT platform, acquisition_type, trophy_progress, trophies_earned, trophies_defined "
-                "FROM stg_psn_library WHERE np_communication_id = ?",
-                [platform_data["psn"]["external_id"]])
-            psn_detail = rows[0] if rows else {}
-
-        gog_detail: dict = {}
-        if "gog" in platform_data:
-            rows = _query(conn,
-                "SELECT release_date FROM stg_gog_library WHERE product_id = ?",
-                [platform_data["gog"]["external_id"]])
-            gog_detail = rows[0] if rows else {}
+        steam_detail, psn_detail, gog_detail = _fetch_platform_details(conn, platform_data)
 
         genres = [r["name"] for r in _query(conn,
             "SELECT gn.name FROM game_genres gg JOIN genres gn ON gn.id = gg.genre_id WHERE gg.game_id = ?",
@@ -594,6 +610,23 @@ async def game_detail(request: Request, game_id: int):
             ORDER BY g.title
         """, [game_id])
 
+        igdb_detail: dict = {}
+        if game["igdb_id"]:
+            rows = _query(conn,
+                "SELECT summary, developer, publisher, first_release_date, "
+                "aggregated_rating, aggregated_rating_count "
+                "FROM stg_igdb WHERE igdb_id = ?",
+                [game["igdb_id"]])
+            igdb_detail = rows[0] if rows else {}
+
+        achievement_details: list = []
+        if "steam" in platform_data:
+            achievement_details = _query(conn,
+                "SELECT display_name, description, icon_url, icon_gray_url, achieved, unlock_time "
+                "FROM stg_steam_achievement_details WHERE app_id = ? "
+                "ORDER BY achieved DESC, display_name",
+                [int(platform_data["steam"]["external_id"])])
+
     return templates.TemplateResponse(request, "game_detail.html", {
         "user": user,
         "game": game,
@@ -608,6 +641,8 @@ async def game_detail(request: Request, game_id: int):
         "availability": availability,
         "prefs": prefs,
         "merged_entries": merged_entries,
+        "igdb_detail": igdb_detail,
+        "achievement_details": achievement_details,
     })
 
 
