@@ -18,6 +18,11 @@ SteamPunk is a locally-hosted web app that lets you log in with your Steam accou
   - `STEAM_API_KEY` — from [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey)
   - `SECRET_KEY` — any long random string used to sign sessions
 
+> **Steam Privacy Requirements**
+>
+> - **Library sync** works regardless of your Steam privacy settings.
+> - **Achievement sync** requires both **Profile** and **Game details** to be set to **Public** in Steam → Edit Profile → Privacy Settings. If these are private, the achievement sync will complete with 0 results and log a warning. You can set them back to private after syncing — the data is stored locally.
+
 ## Step-by-Step
 
 ### 1. Sync your Steam library
@@ -76,6 +81,9 @@ Open the dropdown menu in the top-right corner (your avatar and name) and click 
 
 **Library page is empty**
 : Run `python src/collect.py --platforms steam` first to populate the database.
+
+**Achievement sync returns 0 games**
+: Your Steam **Profile** and/or **Game details** are set to Private. Go to Steam → Edit Profile → Privacy Settings and set both to Public, run `Steam › Achievements`, then set them back to Private if desired.
 
 **Avatar or display name missing in the nav menu**
 : Check that `STEAM_API_KEY` in `gandalf.json` is valid. The app fetches your profile from the Steam Web API on login.

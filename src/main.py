@@ -47,7 +47,10 @@ def _run_sync(platforms: list[str] | None = None):
                 log.write(f"Platforms: {', '.join(platforms)}\n")
             log.write(f"{'='*60}\n")
             log.flush()
-            subprocess.run(cmd, cwd=str(SRC_DIR), stdout=log, stderr=log, text=True)
+            kwargs = {}
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            subprocess.run(cmd, cwd=str(SRC_DIR), stdout=log, stderr=log, text=True, **kwargs)
     finally:
         with _sync_lock:
             _sync_running = False

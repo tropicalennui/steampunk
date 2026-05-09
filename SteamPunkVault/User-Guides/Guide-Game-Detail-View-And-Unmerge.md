@@ -1,8 +1,13 @@
 ---
 title: "Guide: Game Detail View & Unmerge"
 date: 2026-05-09
-tags: [user-guide, library, detail-view, unmerge, merge]
-story: "[[US-015: Game Detail View & Unmerge]]"
+tags:
+  - user-guide
+  - library
+  - detail-view
+  - unmerge
+  - merge
+story: "[[US-015-Game-Detail-View-And-Unmerge]]"
 ---
 
 ## Overview
