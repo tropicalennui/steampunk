@@ -168,11 +168,14 @@ def run_igdb_matching(
         WHERE g.igdb_id IS NULL
     """).fetchall()
 
-    print(f"  {len(rows)} platform_games need IGDB lookup")
+    n = len(rows)
+    print(f"  {n} platform_games need IGDB lookup")
     matched = 0
     not_found = 0
 
-    for _pg_id, platform_id, external_id, game_id, title in rows:
+    for i, (_pg_id, platform_id, external_id, game_id, title) in enumerate(rows, 1):
+        _f = i * 20 // n if n else 20
+        print(f"\r  [{'#' * _f}{'-' * (20 - _f)}] {i}/{n}", end="", flush=True)
         igdb_game_id = _resolve_igdb_id(igdb_token, igdb_client_id, platform_id, external_id, title)
         if igdb_game_id is None:
             not_found += 1
@@ -180,7 +183,10 @@ def run_igdb_matching(
         matched += 1
         _apply_igdb_match(conn, game_id, igdb_game_id)
 
-    print(f"  {matched} games matched to IGDB ({not_found} not found in IGDB)")
+    if n:
+        print(f"\r  {matched} matched, {not_found} not found in IGDB" + " " * 15)
+    else:
+        print(f"  {matched} games matched to IGDB ({not_found} not found in IGDB)")
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +196,7 @@ def run_igdb_matching(
 _METADATA_FIELDS = (
     "id,summary,aggregated_rating,aggregated_rating_count,"
     "first_release_date,"
+    "cover.image_id,"
     "involved_companies.company.name,"
     "involved_companies.developer,"
     "involved_companies.publisher"
@@ -220,8 +227,7 @@ def _fetch_igdb_metadata(
         return None
 
 
-def _parse_metadata(raw: dict) -> dict:
-    """Flatten raw IGDB game response into the stg_igdb column values."""
+def _parse_companies(raw: dict) -> tuple[list[str], list[str]]:
     developers: list[str] = []
     publishers: list[str] = []
     for ic in raw.get("involved_companies") or []:
@@ -232,17 +238,29 @@ def _parse_metadata(raw: dict) -> dict:
             developers.append(name)
         if ic.get("publisher"):
             publishers.append(name)
+    return developers, publishers
 
-    release_date: Optional[date] = None
+
+def _parse_release_date(raw: dict) -> Optional[date]:
     epoch = raw.get("first_release_date")
-    if epoch is not None:
-        try:
-            release_date = datetime.fromtimestamp(epoch, UTC).date()
-        except (OSError, OverflowError, ValueError):
-            pass
+    if epoch is None:
+        return None
+    try:
+        return datetime.fromtimestamp(epoch, UTC).date()
+    except (OSError, OverflowError, ValueError):
+        return None
+
+
+def _parse_metadata(raw: dict) -> dict:
+    """Flatten raw IGDB game response into the stg_igdb column values."""
+    developers, publishers = _parse_companies(raw)
+    release_date = _parse_release_date(raw)
+    image_id = (raw.get("cover") or {}).get("image_id")
+    cover_url = f"https://images.igdb.com/igdb/image/upload/t_cover_big/{image_id}.jpg" if image_id else None
 
     return {
         "summary": raw.get("summary"),
+        "cover_url": cover_url,
         "developer": developers or None,
         "publisher": publishers or None,
         "first_release_date": release_date,
@@ -256,18 +274,23 @@ def run_igdb_metadata(
     igdb_token: str,
     igdb_client_id: str,
 ) -> None:
-    """For each games row with an igdb_id not yet in stg_igdb, fetch and upsert metadata."""
+    """For each games row with an igdb_id not yet in stg_igdb (or missing cover_url), fetch metadata."""
     rows = conn.execute("""
         SELECT DISTINCT g.igdb_id
         FROM games g
         WHERE g.igdb_id IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM stg_igdb s WHERE s.igdb_id = g.igdb_id)
+          AND NOT EXISTS (
+              SELECT 1 FROM stg_igdb s WHERE s.igdb_id = g.igdb_id AND s.cover_url IS NOT NULL
+          )
     """).fetchall()
 
-    print(f"  {len(rows)} IGDB games need metadata fetch")
+    n = len(rows)
+    print(f"  {n} IGDB games need metadata fetch")
     now = datetime.now(UTC)
 
-    for (igdb_id,) in rows:
+    for i, (igdb_id,) in enumerate(rows, 1):
+        _f = i * 20 // n if n else 20
+        print(f"\r  [{'#' * _f}{'-' * (20 - _f)}] {i}/{n}", end="", flush=True)
         raw = _fetch_igdb_metadata(igdb_token, igdb_client_id, igdb_id)
         time.sleep(IGDB_DELAY)
         if raw is None:
@@ -275,11 +298,12 @@ def run_igdb_metadata(
         m = _parse_metadata(raw)
         conn.execute("""
             INSERT INTO stg_igdb
-                (igdb_id, summary, developer, publisher,
+                (igdb_id, summary, cover_url, developer, publisher,
                  first_release_date, aggregated_rating, aggregated_rating_count, collected_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (igdb_id) DO UPDATE SET
                 summary                 = excluded.summary,
+                cover_url               = excluded.cover_url,
                 developer               = excluded.developer,
                 publisher               = excluded.publisher,
                 first_release_date      = excluded.first_release_date,
@@ -287,12 +311,23 @@ def run_igdb_metadata(
                 aggregated_rating_count = excluded.aggregated_rating_count,
                 collected_at            = excluded.collected_at
         """, [
-            igdb_id, m["summary"], m["developer"], m["publisher"],
+            igdb_id, m["summary"], m["cover_url"], m["developer"], m["publisher"],
             m["first_release_date"], m["aggregated_rating"],
             m["aggregated_rating_count"], now,
         ])
 
-    print("  IGDB metadata pass complete")
+    if n:
+        print(f"\r  IGDB metadata pass complete — {n} games fetched" + " " * 10)
+    else:
+        print("  IGDB metadata pass complete")
+
+    conn.execute("""
+        UPDATE games g SET cover_url = si.cover_url
+        FROM stg_igdb si
+        WHERE g.igdb_id = si.igdb_id
+          AND g.cover_url IS NULL
+          AND si.cover_url IS NOT NULL
+    """)
 
 
 # ---------------------------------------------------------------------------
@@ -382,10 +417,13 @@ def run_store_availability(
         [(gid, igdb_id, title, PLATFORM_GOG,    IGDB_GOG_CATEGORY)   for gid, igdb_id, title in psn_only_check_gog]
     )
 
-    print(f"  {len(checks)} store availability checks to run")
+    n = len(checks)
+    print(f"  {n} store availability checks to run")
     now = datetime.now(UTC)
 
-    for game_id, igdb_id, title, check_platform_id, igdb_category in checks:
+    for i, (game_id, igdb_id, title, check_platform_id, igdb_category) in enumerate(checks, 1):
+        _f = i * 20 // n if n else 20
+        print(f"\r  [{'#' * _f}{'-' * (20 - _f)}] {i}/{n}", end="", flush=True)
         try:
             resp = requests.post(
                 f"{IGDB_API_URL}/external_games",
@@ -413,6 +451,9 @@ def run_store_availability(
                 external_id = excluded.external_id,
                 checked_at  = excluded.checked_at
         """, [game_id, check_platform_id, available, external_id, now])
+
+    if n:
+        print(f"\r  Store availability check complete — {n} games checked" + " " * 10)
 
 
 # ---------------------------------------------------------------------------
