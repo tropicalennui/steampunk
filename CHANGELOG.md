@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/tropicalennui/steampunk/compare/v0.4.0...v0.4.1) (2026-05-13)
+
+
+### Refactoring
+
+* **igdb:** extract helpers to reduce cognitive complexity in _parse_metadata ([f57ca66](https://github.com/tropicalennui/steampunk/commit/f57ca66f22277274276627e9ed62fe2cace80891))
+
 ## [0.4.0](https://github.com/tropicalennui/steampunk/compare/v0.3.0...v0.4.0) (2026-05-09)
 
 
